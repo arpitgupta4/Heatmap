@@ -1170,14 +1170,15 @@ button, a, [role="button"],
     border-radius: var(--radius-full);
   }
 
-  /* Filters: single column */
+  /* Filters: 2-col compact grid — Filter+Sort on one row, Direction on next */
   .filters-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: 10px;
   }
 
+  /* Search always spans full width */
   .filter-field:first-child {
-    grid-column: auto;
+    grid-column: 1 / -1;
   }
 
   /* Summary 2×2 stays but smaller */
@@ -1195,18 +1196,6 @@ button, a, [role="button"],
     min-height: 72px;
   }
 
-  /* Table rows compact */
-  .stocks-table thead th,
-  .stocks-table tbody td {
-    padding: 8px 10px;
-    font-size: 0.8rem;
-  }
-
-  .stocks-table thead th:nth-child(4),
-  .stocks-table tbody td:nth-child(4) {
-    /* Hide Group column on very small screens */
-    display: none;
-  }
 
   /* Last updated pill */
   #lastUpdated {
@@ -1226,6 +1215,126 @@ button, a, [role="button"],
   .mover-item {
     padding: 8px 12px;
     font-size: 0.82rem;
+  }
+}
+
+/* ============================================================
+   MOBILE CARD VIEW — table → stacked cards (max-width: 600px)
+   No horizontal scroll. Each row becomes a 2-column mini-card:
+     [Symbol   ]  [badge]
+     [Sector   ]  [badge]
+     [Industry ]  [badge]
+   ============================================================ */
+@media (max-width: 600px) {
+
+  /* Kill horizontal scroll — no longer needed */
+  .table-wrapper {
+    overflow-x: visible;
+    -webkit-overflow-scrolling: auto;
+  }
+
+  /* Hide column headers */
+  .stocks-table thead {
+    display: none;
+  }
+
+  /* Block layout for table + body */
+  .stocks-table,
+  .stocks-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  /* Each row → mini card */
+  .stocks-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto auto;
+    column-gap: 10px;
+    row-gap: 1px;
+    padding: 11px 14px;
+    border-bottom: 1px solid var(--border);
+    transition: background var(--dur-fast) var(--ease);
+  }
+
+  .stocks-table tbody tr:first-child {
+    border-top: 1px solid var(--border);
+  }
+
+  .stocks-table tbody tr:hover {
+    background: var(--bg-hover);
+  }
+
+  /* ── All tds: strip inherited table styles ── */
+  .stocks-table tbody td {
+    display: block;
+    border: none;
+    padding: 0;
+    font-size: inherit;
+    /* override sticky from desktop */
+    position: static !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    z-index: auto !important;
+  }
+
+  /* Row 1 col 1 — Symbol (bold ticker) */
+  .stocks-table tbody td.col-symbol {
+    grid-column: 1;
+    grid-row: 1;
+    font-size: 0.90rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Row 1–3 col 2 — % Change badge (spans all 3 rows, right-aligned) */
+  .stocks-table tbody td.col-change {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+  }
+
+  /* Row 2 col 1 — Sector name */
+  .stocks-table tbody td:nth-child(2) {
+    grid-column: 1;
+    grid-row: 2;
+    font-size: 0.76rem;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-top: 2px;
+  }
+
+  /* Row 3 col 1 — Industry */
+  .stocks-table tbody td:nth-child(3) {
+    grid-column: 1;
+    grid-row: 3;
+    font-size: 0.70rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-top: 1px;
+  }
+
+  /* Hide Group and Subgroup — shown in detail later */
+  .stocks-table tbody td:nth-child(4),
+  .stocks-table tbody td:nth-child(5) {
+    display: none;
+  }
+
+  /* Change badge: slightly smaller on mobile */
+  .change-badge {
+    font-size: 0.76rem;
+    padding: 4px 9px;
+    white-space: nowrap;
   }
 }
 
@@ -1261,11 +1370,6 @@ button, a, [role="button"],
     font-size: 1rem;
   }
 
-  /* Table: also hide Subgroup col */
-  .stocks-table thead th:nth-child(5),
-  .stocks-table tbody td:nth-child(5) {
-    display: none;
-  }
 
   .heatmap-grid {
     grid-template-columns: 1fr 1fr;

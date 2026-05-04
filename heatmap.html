@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- viewport-fit=cover is critical for iPhone notch / Dynamic Island safe-area insets -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="description" content="Live stock heatmap dashboard — color-coded performance, sector heatmap, top movers and market sentiment from your Google Sheets data." />
+    <!-- iOS PWA / Safari -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Stock Heatmap" />
+    <!-- Android Chrome browser toolbar color -->
+    <meta name="theme-color" content="#020617" />
+    <title>Stock Heatmap Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+
+      <!-- ── HEADER ─────────────────────────────────────── -->
+      <header class="app-header">
+        <div class="app-header-left">
+          <h1>Stock Heatmap</h1>
+          <p>Live color-coded performance · sector heatmap · top movers</p>
+          <div class="header-meta">
+            <span id="lastUpdated">Fetching data…</span>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button id="refreshButton" aria-label="Refresh data">
+            <!-- refresh icon -->
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                 stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span class="btn-label">Refresh</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- ── CONTROLS ───────────────────────────────────── -->
+      <section class="panel controls-panel" aria-label="View controls and filters">
+        <div class="controls-top">
+          <div class="view-tabs" role="tablist" aria-label="Dashboard view">
+            <button class="tab-button active" data-view="stocks" role="tab" aria-selected="true" id="tab-stocks">
+              Stocks
+            </button>
+            <button class="tab-button" data-view="heatmap" role="tab" aria-selected="false" id="tab-heatmap">
+              Heatmap
+            </button>
+          </div>
+        </div>
+
+        <div class="filters-row">
+          <div class="filter-field">
+            <label for="searchInput">Search</label>
+            <div class="search-wrapper">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input id="searchInput" type="search" placeholder="Symbol, sector, group… (press /)" autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="filter-field">
+            <label for="filterSelect">Filter</label>
+            <select id="filterSelect">
+              <option value="all">All stocks</option>
+              <option value="positive">Gainers only</option>
+              <option value="negative">Losers only</option>
+            </select>
+          </div>
+
+          <div class="filter-field">
+            <label for="sortSelect">Sort by</label>
+            <select id="sortSelect">
+              <option value="dailyChange">% Change</option>
+              <option value="securityId">Symbol</option>
+              <option value="name">Sector / Name</option>
+              <option value="industry">Industry</option>
+            </select>
+          </div>
+
+          <div class="filter-field">
+            <label for="directionSelect">Direction</label>
+            <select id="directionSelect">
+              <option value="desc">Descending</option>
+              <option value="asc">Ascending</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── SENTIMENT BAR ──────────────────────────────── -->
+      <div class="sentiment-bar-container" id="sentimentContainer" aria-label="Market sentiment">
+        <div class="sentiment-labels">
+          <span class="gain-label" id="sentimentGainLabel">— Gaining</span>
+          <span class="loss-label" id="sentimentLossLabel">Losing —</span>
+        </div>
+        <div class="sentiment-track" role="progressbar" aria-label="Percentage of gaining stocks">
+          <div class="sentiment-fill" id="sentimentFill" style="width: 50%"></div>
+        </div>
+      </div>
+
+      <!-- ── SUMMARY CARDS ──────────────────────────────── -->
+      <section class="panel summary-panel" aria-label="Market summary">
+        <div class="summary-card">
+          <span class="card-label">Stocks loaded</span>
+          <strong class="card-value" id="totalCount">—</strong>
+        </div>
+        <div class="summary-card">
+          <span class="card-label">Avg % change</span>
+          <strong class="card-value" id="avgChange">—</strong>
+        </div>
+        <div class="summary-card">
+          <span class="card-label">Best performer</span>
+          <strong class="card-value gain" id="bestPerformer">—</strong>
+        </div>
+        <div class="summary-card">
+          <span class="card-label">Worst performer</span>
+          <strong class="card-value loss" id="worstPerformer">—</strong>
+        </div>
+      </section>
+
+      <!-- ── MAIN CONTENT ───────────────────────────────── -->
+      <section class="panel content-panel" aria-live="polite">
+        <!-- Skeleton loader (shown while fetching) -->
+        <div id="skeletonLoader" aria-busy="true" aria-label="Loading data">
+          <table class="skeleton-table" aria-hidden="true">
+            <tbody id="skeletonBody"></tbody>
+          </table>
+        </div>
+
+        <!-- Error banner (shown on fetch failure) -->
+        <div id="errorBanner" class="error-banner hidden" role="alert">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span id="errorMessage">Unable to fetch data. Check your network or sheet publishing status.</span>
+          <button id="errorRetry">Retry</button>
+        </div>
+
+        <!-- Stocks table view -->
+        <div id="stocksView" class="content-view hidden" role="tabpanel" aria-labelledby="tab-stocks">
+          <div class="table-wrapper">
+            <table class="stocks-table" aria-label="Stocks list">
+              <thead>
+                <tr>
+                  <th class="sortable" data-col="securityId">Symbol <span class="sort-icon">↕</span></th>
+                  <th class="sortable" data-col="name">Sector <span class="sort-icon">↕</span></th>
+                  <th class="sortable" data-col="industry">Industry <span class="sort-icon">↕</span></th>
+                  <th class="sortable" data-col="group">Group <span class="sort-icon">↕</span></th>
+                  <th>Subgroup</th>
+                  <th class="sortable" data-col="dailyChange" style="text-align:right">% Change <span class="sort-icon">↕</span></th>
+                </tr>
+              </thead>
+              <tbody id="stocksBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Heatmap view -->
+        <div id="heatmapView" class="content-view hidden" role="tabpanel" aria-labelledby="tab-heatmap"></div>
+      </section>
+
+      <!-- ── TOP MOVERS ─────────────────────────────────── -->
+      <section class="panel analysis-panel" aria-label="Top movers">
+        <p class="panel-title">Top Movers</p>
+        <div class="analysis-grid">
+          <div>
+            <p class="mover-list-title gainers">▲ Top 5 Gainers</p>
+            <ol class="mover-list" id="topGainers" aria-label="Top gainers"></ol>
+          </div>
+          <div>
+            <p class="mover-list-title losers">▼ Top 5 Losers</p>
+            <ol class="mover-list" id="topLosers" aria-label="Top losers"></ol>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── FOOTER ─────────────────────────────────────── -->
+      <footer class="app-footer">
+        <p>Data fetched from your published Google Sheets CSV · press <kbd>/</kbd> to search</p>
+      </footer>
+
+    </div><!-- /.app-shell -->
+
+    <!-- ── TOAST ─────────────────────────────────────── -->
+    <div id="toastNotification" class="toast" aria-live="polite" aria-atomic="true"></div>
+
+    <script src="script.js"></script>
+  </body>
+</html>

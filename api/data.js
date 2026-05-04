@@ -1,0 +1,146 @@
+/**
+ * Vercel Serverless Function — /api/data
+ *
+ * Fetches both Google Sheets CSVs server-side, parses them into JSON,
+ * and returns the result with edge-cache headers.
+ *
+ * The sheet URLs never reach the client browser.
+ *
+ * To set up on Vercel:
+ *   1. Go to your project → Settings → Environment Variables
+ *   2. Add: STOCKS_CSV_URL  = <your stocks sheet CSV URL>
+ *   3. Add: HEATMAP_CSV_URL = <your heatmap sheet CSV URL>
+ *
+ * For local dev (vercel dev), create a .env.local file — see .env.local template.
+ */
+
+// ─── Sheet URLs ────────────────────────────────────────────────────────────────
+// These are read from Vercel environment variables.
+// Fallback values are included so the function works in local dev without setup,
+// but you should set real env vars in the Vercel dashboard before deploying.
+const STOCKS_CSV_URL =
+  process.env.STOCKS_CSV_URL ||
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vT3osxouCCViNZUmiibpkD3BrPn0DzkRylyU-Yad6E6-T5NI3bYfL1DL0wD5-NmgVpvE7j2afXv8Dx4/pub?gid=0&single=true&output=csv';
+
+const HEATMAP_CSV_URL =
+  process.env.HEATMAP_CSV_URL ||
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vT3osxouCCViNZUmiibpkD3BrPn0DzkRylyU-Yad6E6-T5NI3bYfL1DL0wD5-NmgVpvE7j2afXv8Dx4/pub?gid=1442357326&single=true&output=csv';
+
+// ─── CSV Parsing ───────────────────────────────────────────────────────────────
+function parseCsvLine(line) {
+  const values = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') { inQuotes = !inQuotes; continue; }
+    if (ch === ',' && !inQuotes) { values.push(current); current = ''; continue; }
+    current += ch;
+  }
+  values.push(current);
+  return values.map((v) => v.trim());
+}
+
+function parseCsvRows(text) {
+  return text.trim().split(/\r?\n/).filter(Boolean).map(parseCsvLine);
+}
+
+function parseCsvToObjects(text) {
+  const rows = parseCsvRows(text);
+  const headers = rows[0] || [];
+  return rows.slice(1).map((row) => {
+    const obj = {};
+    headers.forEach((h, i) => { obj[h || `col_${i}`] = row[i] ?? ''; });
+    return obj;
+  });
+}
+
+function parseNumber(value) {
+  const n = parseFloat(String(value).replace(/[^0-9.-]+/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
+
+// ─── Data Normalization ────────────────────────────────────────────────────────
+function normalizeStockRow(row) {
+  return {
+    securityId:  row['Security Id'] || row['Name'] || '',
+    name:        row['Sector Name'] || row['Name'] || row['Security Id'] || '',
+    industry:    row['Industry New Name'] || row['Industry'] || '',
+    group:       row['Igroup Name'] || row['Group'] || '',
+    subgroup:    row['ISubgroup Name'] || row['Subgroup'] || '',
+    dailyChange: parseNumber(
+      row['%Change'] || row['Daily Chang'] || row['Daily Change'] ||
+      row['% Change'] || row['Daily %change'] || ''
+    ),
+  };
+}
+
+function buildHeatmapItems(text) {
+  const rows = parseCsvRows(text);
+  const header = rows[0] || [];
+  const sections = [];
+
+  for (let i = 0; i < header.length; i++) {
+    const label = header[i]?.trim();
+    const next  = header[i + 1]?.trim();
+    if (!label || !next) continue;
+    if (/change/i.test(next)) {
+      sections.push({ nameIndex: i, changeIndex: i + 1, type: label });
+      i++;
+    }
+  }
+
+  return rows.slice(1).flatMap((row) =>
+    sections.map((s) => {
+      const name = row[s.nameIndex] || '';
+      const val  = parseNumber(row[s.changeIndex] || '');
+      return name ? { type: s.type, name, dailyChange: val } : null;
+    })
+  ).filter(Boolean);
+}
+
+// ─── Handler ───────────────────────────────────────────────────────────────────
+export default async function handler(req, res) {
+  // Only allow GET
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  try {
+    // Fetch both sheets in parallel
+    const [stocksRes, heatmapRes] = await Promise.all([
+      fetch(STOCKS_CSV_URL),
+      fetch(HEATMAP_CSV_URL),
+    ]);
+
+    if (!stocksRes.ok)  throw new Error(`Stocks sheet fetch failed: HTTP ${stocksRes.status}`);
+    if (!heatmapRes.ok) throw new Error(`Heatmap sheet fetch failed: HTTP ${heatmapRes.status}`);
+
+    const [stocksCsv, heatmapCsv] = await Promise.all([
+      stocksRes.text(),
+      heatmapRes.text(),
+    ]);
+
+    const stocks  = parseCsvToObjects(stocksCsv).map(normalizeStockRow);
+    const heatmap = buildHeatmapItems(heatmapCsv);
+
+    // Edge cache for 5 min, serve stale for 10 min while revalidating.
+    // Vercel's CDN will cache this globally — repeat requests within 5 min
+    // return instantly from the nearest edge node without invoking this function.
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    res.setHeader('Content-Type', 'application/json');
+
+    return res.status(200).json({
+      stocks,
+      heatmap,
+      cachedAt: Date.now(),
+      counts: { stocks: stocks.length, heatmap: heatmap.length },
+    });
+  } catch (err) {
+    console.error('[api/data] Error:', err.message);
+    return res.status(502).json({
+      error: 'Failed to fetch sheet data',
+      detail: err.message,
+    });
+  }
+}

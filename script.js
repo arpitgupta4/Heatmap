@@ -449,6 +449,15 @@ function renderHeatmapCards(items) {
     return;
   }
 
+  // Build stock count lookup: count how many stocks match each name
+  // across subgroup, group, industry, and sector fields
+  const stockCountMap = {};
+  for (const s of state.stocks) {
+    for (const field of [s.subgroup, s.group, s.industry, s.name]) {
+      if (field) stockCountMap[field] = (stockCountMap[field] || 0) + 1;
+    }
+  }
+
   const grouped = items.reduce((acc, item) => {
     (acc[item.type] = acc[item.type] || []).push(item);
     return acc;
@@ -475,13 +484,15 @@ function renderHeatmapCards(items) {
       const cardClass = item.dailyChange > 0 ? 'gain-card' : item.dailyChange < 0 ? 'loss-card' : '';
       const mag = Math.abs(item.dailyChange) / maxAbs;
       const valueFontSize = (1 + mag * 0.6).toFixed(2);
+      const count = stockCountMap[item.name];
+      const displayName = count ? `${item.name} (${count})` : item.name;
 
       const card = document.createElement('div');
       card.className = `heatmap-card copyable ${cardClass}`;
       card.dataset.copy = item.name;
       card.title = `Click to copy "${item.name}"`;
       card.innerHTML = `
-        <span class="heatmap-card-name">${item.name}</span>
+        <span class="heatmap-card-name">${displayName}</span>
         <span class="heatmap-card-value" style="font-size:${valueFontSize}rem">
           ${item.dailyChange > 0 ? '▲' : item.dailyChange < 0 ? '▼' : ''} ${formatChange(item.dailyChange)}
         </span>

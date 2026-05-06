@@ -121,8 +121,6 @@ const el = {
   errorMessage:           document.getElementById('errorMessage'),
   errorRetry:             document.getElementById('errorRetry'),
   totalCount:             document.getElementById('totalCount'),
-  bestPerformer:          null, // replaced by marketSentiment
-  worstPerformer:         null, // replaced by advDecliners
   marketSentiment:        document.getElementById('marketSentiment'),
   advDecliners:           document.getElementById('advDecliners'),
   avgChange:              document.getElementById('avgChange'),

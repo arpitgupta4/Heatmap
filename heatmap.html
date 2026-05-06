@@ -4,14 +4,14 @@
     <meta charset="UTF-8" />
     <!-- viewport-fit=cover is critical for iPhone notch / Dynamic Island safe-area insets -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <meta name="description" content="Live stock heatmap dashboard — color-coded performance, sector heatmap, top movers and market sentiment from your Google Sheets data." />
+    <meta name="description" content="Stock Dashboard — live performance, sector heatmap, radar watchlist, market sentiment and top movers." />
     <!-- iOS PWA / Safari -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="Stock Heatmap" />
+    <meta name="apple-mobile-web-app-title" content="Stock Dashboard" />
     <!-- Android Chrome browser toolbar color -->
     <meta name="theme-color" content="#020617" />
-    <title>Stock Heatmap Dashboard</title>
+    <title>Stock Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="style.css" />
@@ -65,7 +65,7 @@
                    stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
-              <input id="searchInput" type="search" placeholder="Symbol, sector, group… (press /)" autocomplete="off" />
+              <input id="searchInput" type="search" placeholder="Symbol" autocomplete="off" />
             </div>
           </div>
 
@@ -209,7 +209,7 @@
 
       <!-- ── FOOTER ─────────────────────────────────────── -->
       <footer class="app-footer">
-        <p>Data fetched from your published Google Sheets CSV · press <kbd>/</kbd> to search</p>
+        <p>Press <kbd>/</kbd> to search</p>
       </footer>
 
     </div><!-- /.app-shell -->

@@ -402,15 +402,24 @@ function renderStocksTable(stocks) {
     return;
   }
 
+  // Count subgroup occurrences across the entire dataset for stable numbers
+  const subgroupCounts = {};
+  for (const s of state.stocks) {
+    if (s.subgroup) {
+      subgroupCounts[s.subgroup] = (subgroupCounts[s.subgroup] || 0) + 1;
+    }
+  }
+
   const frag = document.createDocumentFragment();
   for (const s of stocks) {
+    const subLabel = s.subgroup ? `${s.subgroup} (${subgroupCounts[s.subgroup]})` : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-symbol copyable" data-copy="${s.securityId}">${s.securityId}</td>
       <td class="copyable" data-copy="${s.name}">${s.name}</td>
       <td class="copyable" data-copy="${s.industry}">${s.industry}</td>
       <td class="copyable" data-copy="${s.group}">${s.group}</td>
-      <td class="copyable" data-copy="${s.subgroup}">${s.subgroup}</td>
+      <td class="copyable" data-copy="${subLabel}">${subLabel}</td>
       <td class="col-change">${changeBadge(s.dailyChange)}</td>
     `;
     frag.appendChild(tr);

@@ -26,6 +26,10 @@ const HEATMAP_CSV_URL =
   process.env.HEATMAP_CSV_URL ||
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vT3osxouCCViNZUmiibpkD3BrPn0DzkRylyU-Yad6E6-T5NI3bYfL1DL0wD5-NmgVpvE7j2afXv8Dx4/pub?gid=1442357326&single=true&output=csv';
 
+const RADAR_CSV_URL =
+  process.env.RADAR_CSV_URL ||
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjR79H2FbUkdxllGsK37_U8Q-zAkyYTZcV2yS5IC-gPuOvha1Q-agxqPppXitU6nz-yjODMlYaRDJC/pub?gid=704501126&single=true&output=csv';
+
 // ─── CSV Parsing ───────────────────────────────────────────────────────────────
 function parseCsvLine(line) {
   const values = [];
@@ -61,6 +65,17 @@ function parseNumber(value) {
 }
 
 // ─── Data Normalization ────────────────────────────────────────────────────────
+function normalizeRadarRow(row) {
+  return {
+    symbol:    (row['Symbol']    || '').trim(),
+    prevClose: parseNumber(row['Prev Close'] || 0),
+    ltp:       parseNumber(row['LTP']       || 0),
+    change:    parseNumber(row['Change']    || 0),
+    pctChange: parseNumber(row['%Change']   || 0),
+    marketCap: parseNumber(row['MarketCap'] || 0),
+  };
+}
+
 function normalizeStockRow(row) {
   return {
     securityId:  row['Security Id'] || row['Name'] || '',
@@ -108,21 +123,25 @@ export default async function handler(req, res) {
 
   try {
     // Fetch both sheets in parallel
-    const [stocksRes, heatmapRes] = await Promise.all([
+    const [stocksRes, heatmapRes, radarRes] = await Promise.all([
       fetch(STOCKS_CSV_URL),
       fetch(HEATMAP_CSV_URL),
+      fetch(RADAR_CSV_URL),
     ]);
 
     if (!stocksRes.ok)  throw new Error(`Stocks sheet fetch failed: HTTP ${stocksRes.status}`);
     if (!heatmapRes.ok) throw new Error(`Heatmap sheet fetch failed: HTTP ${heatmapRes.status}`);
+    if (!radarRes.ok)   throw new Error(`Radar sheet fetch failed: HTTP ${radarRes.status}`);
 
-    const [stocksCsv, heatmapCsv] = await Promise.all([
+    const [stocksCsv, heatmapCsv, radarCsv] = await Promise.all([
       stocksRes.text(),
       heatmapRes.text(),
+      radarRes.text(),
     ]);
 
     const stocks  = parseCsvToObjects(stocksCsv).map(normalizeStockRow);
     const heatmap = buildHeatmapItems(heatmapCsv);
+    const radar   = parseCsvToObjects(radarCsv).map(normalizeRadarRow);
 
     // Edge cache for 5 min, serve stale for 10 min while revalidating.
     // Vercel's CDN will cache this globally — repeat requests within 5 min
@@ -133,8 +152,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       stocks,
       heatmap,
+      radar,
       cachedAt: Date.now(),
-      counts: { stocks: stocks.length, heatmap: heatmap.length },
+      counts: { stocks: stocks.length, heatmap: heatmap.length, radar: radar.length },
     });
   } catch (err) {
     console.error('[api/data] Error:', err.message);

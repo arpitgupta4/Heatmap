@@ -52,6 +52,9 @@
             <button class="tab-button" data-view="heatmap" role="tab" aria-selected="false" id="tab-heatmap">
               Heatmap
             </button>
+            <button class="tab-button" data-view="radar" role="tab" aria-selected="false" id="tab-radar">
+              Radar
+            </button>
           </div>
         </div>
 
@@ -169,6 +172,25 @@
 
         <!-- Heatmap view -->
         <div id="heatmapView" class="content-view hidden" role="tabpanel" aria-labelledby="tab-heatmap"></div>
+
+        <!-- Radar view -->
+        <div id="radarView" class="content-view hidden" role="tabpanel" aria-labelledby="tab-radar">
+          <div class="table-wrapper">
+            <table class="stocks-table radar-table" aria-label="Radar stocks">
+              <thead>
+                <tr>
+                  <th class="radar-sortable" data-col="symbol">Symbol <span class="sort-icon">⇕</span></th>
+                  <th class="radar-sortable col-num" data-col="prevClose">Prev Close <span class="sort-icon">⇕</span></th>
+                  <th class="radar-sortable col-num" data-col="ltp">LTP <span class="sort-icon">⇕</span></th>
+                  <th class="radar-sortable col-num" data-col="change">Change <span class="sort-icon">⇕</span></th>
+                  <th class="radar-sortable col-num" data-col="pctChange">% Change <span class="sort-icon">⇕</span></th>
+                  <th class="radar-sortable col-num" data-col="marketCap">Mkt Cap ₹Cr <span class="sort-icon">⇕</span></th>
+                </tr>
+              </thead>
+              <tbody id="radarBody"></tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- ── TOP MOVERS ─────────────────────────────────── -->

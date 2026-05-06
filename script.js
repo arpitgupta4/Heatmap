@@ -1,7 +1,7 @@
 /* ============================================================
    CONFIG
    ============================================================ */
-const CACHE_KEY = 'heatmapDataCache_v3';
+const CACHE_KEY = 'heatmapDataCache_v4'; // bump → forces cache clear after radar added
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Direct sheet URLs — used ONLY as a local-dev fallback when /api/data
@@ -9,6 +9,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 // sent to the browser; the serverless function fetches them server-side.
 const _STOCKS_CSV  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT3osxouCCViNZUmiibpkD3BrPn0DzkRylyU-Yad6E6-T5NI3bYfL1DL0wD5-NmgVpvE7j2afXv8Dx4/pub?gid=0&single=true&output=csv';
 const _HEATMAP_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT3osxouCCViNZUmiibpkD3BrPn0DzkRylyU-Yad6E6-T5NI3bYfL1DL0wD5-NmgVpvE7j2afXv8Dx4/pub?gid=1442357326&single=true&output=csv';
+const _RADAR_CSV   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjR79H2FbUkdxllGsK37_U8Q-zAkyYTZcV2yS5IC-gPuOvha1Q-agxqPppXitU6nz-yjODMlYaRDJC/pub?gid=704501126&single=true&output=csv';
 
 /* ============================================================
    CSV PARSING (fallback path only — used when /api/data unavailable)
@@ -33,6 +34,17 @@ function _parseCsvRows(text) {
 function _parseNumber(value) {
   const n = parseFloat(String(value).replace(/[^0-9.-]+/g, ''));
   return Number.isFinite(n) ? n : 0;
+}
+
+function _normalizeRadarRow(row) {
+  return {
+    symbol:    (row['Symbol']    || '').trim(),
+    prevClose: _parseNumber(row['Prev Close'] || 0),
+    ltp:       _parseNumber(row['LTP']       || 0),
+    change:    _parseNumber(row['Change']    || 0),
+    pctChange: _parseNumber(row['%Change']   || 0),
+    marketCap: _parseNumber(row['MarketCap'] || 0),
+  };
 }
 
 function _normalizeStockRow(row) {
@@ -79,15 +91,19 @@ function _buildHeatmapItems(text) {
 
 // Fetch directly from Google Sheets (fallback for local dev)
 async function _fetchFromSheets() {
-  const [stocksRes, heatmapRes] = await Promise.all([
+  const [stocksRes, heatmapRes, radarRes] = await Promise.all([
     fetch(_STOCKS_CSV),
     fetch(_HEATMAP_CSV),
+    fetch(_RADAR_CSV),
   ]);
-  if (!stocksRes.ok || !heatmapRes.ok) throw new Error('Sheet fetch failed');
-  const [stocksCsv, heatmapCsv] = await Promise.all([stocksRes.text(), heatmapRes.text()]);
+  if (!stocksRes.ok || !heatmapRes.ok || !radarRes.ok) throw new Error('Sheet fetch failed');
+  const [stocksCsv, heatmapCsv, radarCsv] = await Promise.all([
+    stocksRes.text(), heatmapRes.text(), radarRes.text(),
+  ]);
   return {
     stocks:  _parseCsvToObjects(stocksCsv).map(_normalizeStockRow),
     heatmap: _buildHeatmapItems(heatmapCsv),
+    radar:   _parseCsvToObjects(radarCsv).map(_normalizeRadarRow),
   };
 }
 
@@ -95,44 +111,50 @@ async function _fetchFromSheets() {
    DOM REFERENCES
    ============================================================ */
 const el = {
-  stocksView:          document.getElementById('stocksView'),
-  heatmapView:         document.getElementById('heatmapView'),
-  stocksBody:          document.getElementById('stocksBody'),
-  skeletonLoader:      document.getElementById('skeletonLoader'),
-  errorBanner:         document.getElementById('errorBanner'),
-  errorMessage:        document.getElementById('errorMessage'),
-  errorRetry:          document.getElementById('errorRetry'),
-  totalCount:          document.getElementById('totalCount'),
-  bestPerformer:       document.getElementById('bestPerformer'),
-  worstPerformer:      document.getElementById('worstPerformer'),
-  avgChange:           document.getElementById('avgChange'),
-  topGainers:          document.getElementById('topGainers'),
-  topLosers:           document.getElementById('topLosers'),
-  searchInput:         document.getElementById('searchInput'),
-  filterSelect:        document.getElementById('filterSelect'),
-  sortSelect:          document.getElementById('sortSelect'),
-  directionSelect:     document.getElementById('directionSelect'),
-  refreshButton:       document.getElementById('refreshButton'),
-  lastUpdated:         document.getElementById('lastUpdated'),
-  sentimentFill:       document.getElementById('sentimentFill'),
-  sentimentGainLabel:  document.getElementById('sentimentGainLabel'),
-  sentimentLossLabel:  document.getElementById('sentimentLossLabel'),
-  tabButtons:          [...document.querySelectorAll('.tab-button')],
-  sortableHeaders:     [...document.querySelectorAll('th.sortable')],
+  stocksView:             document.getElementById('stocksView'),
+  heatmapView:            document.getElementById('heatmapView'),
+  radarView:              document.getElementById('radarView'),
+  stocksBody:             document.getElementById('stocksBody'),
+  radarBody:              document.getElementById('radarBody'),
+  skeletonLoader:         document.getElementById('skeletonLoader'),
+  errorBanner:            document.getElementById('errorBanner'),
+  errorMessage:           document.getElementById('errorMessage'),
+  errorRetry:             document.getElementById('errorRetry'),
+  totalCount:             document.getElementById('totalCount'),
+  bestPerformer:          document.getElementById('bestPerformer'),
+  worstPerformer:         document.getElementById('worstPerformer'),
+  avgChange:              document.getElementById('avgChange'),
+  topGainers:             document.getElementById('topGainers'),
+  topLosers:              document.getElementById('topLosers'),
+  searchInput:            document.getElementById('searchInput'),
+  filterSelect:           document.getElementById('filterSelect'),
+  sortSelect:             document.getElementById('sortSelect'),
+  directionSelect:        document.getElementById('directionSelect'),
+  refreshButton:          document.getElementById('refreshButton'),
+  lastUpdated:            document.getElementById('lastUpdated'),
+  sentimentFill:          document.getElementById('sentimentFill'),
+  sentimentGainLabel:     document.getElementById('sentimentGainLabel'),
+  sentimentLossLabel:     document.getElementById('sentimentLossLabel'),
+  tabButtons:             [...document.querySelectorAll('.tab-button')],
+  sortableHeaders:        [...document.querySelectorAll('th.sortable')],
+  radarSortableHeaders:   [...document.querySelectorAll('th.radar-sortable')],
 };
 
 /* ============================================================
    STATE
    ============================================================ */
 const state = {
-  stocks:      [],
-  heatmap:     [],
-  activeView:  'stocks',
-  sortBy:      'dailyChange',
-  sortDir:     'desc',
-  filter:      'all',
-  query:       '',
-  lastFetched: null,
+  stocks:         [],
+  heatmap:        [],
+  radar:          [],
+  activeView:     'stocks',
+  sortBy:         'dailyChange',
+  sortDir:        'desc',
+  filter:         'all',
+  query:          '',
+  lastFetched:    null,
+  radarSortBy:    'pctChange',
+  radarSortDir:   'desc',
 };
 
 /* ============================================================
@@ -141,6 +163,13 @@ const state = {
 function formatChange(value) {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(2)}%`;
+}
+
+function formatPrice(v)     { return `₹${v.toFixed(2)}`; }
+function formatMarketCap(v) {
+  if (v >= 100000) return `₹${(v / 100000).toFixed(2)}L`;
+  if (v >= 1000)   return `₹${Math.round(v).toLocaleString('en-IN')}`;
+  return `₹${v.toFixed(0)}`;
 }
 
 function relativeTime(date) {
@@ -443,12 +472,77 @@ function renderHeatmapCards(items) {
 }
 
 /* ============================================================
+   RENDERING — radar table
+   ============================================================ */
+function renderRadarTable(items) {
+  if (!items.length) {
+    el.radarBody.innerHTML = `
+      <tr><td colspan="6">
+        <div class="empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <p>No radar data available.</p>
+        </div>
+      </td></tr>`;
+    return;
+  }
+
+  const q = state.query.toLowerCase();
+  let filtered = items.filter((r) => {
+    if (q && !r.symbol.toLowerCase().includes(q)) return false;
+    if (state.filter === 'positive') return r.pctChange > 0;
+    if (state.filter === 'negative') return r.pctChange < 0;
+    return true;
+  });
+
+  filtered.sort((a, b) => {
+    const col = state.radarSortBy;
+    let cmp = col === 'symbol'
+      ? a.symbol.localeCompare(b.symbol)
+      : (a[col] ?? 0) - (b[col] ?? 0);
+    return state.radarSortDir === 'asc' ? cmp : -cmp;
+  });
+
+  const frag = document.createDocumentFragment();
+  for (const r of filtered) {
+    const up   = r.pctChange > 0;
+    const down = r.pctChange < 0;
+    const ltpClass = r.ltp > r.prevClose ? 'gain' : r.ltp < r.prevClose ? 'loss' : '';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="col-symbol copyable" data-copy="${r.symbol}">${r.symbol}</td>
+      <td class="col-num">${formatPrice(r.prevClose)}</td>
+      <td class="col-num ${ltpClass}">${formatPrice(r.ltp)}</td>
+      <td class="col-num ${r.change > 0 ? 'gain' : r.change < 0 ? 'loss' : ''}">${r.change > 0 ? '+' : ''}${r.change.toFixed(2)}</td>
+      <td class="col-num">${changeBadge(r.pctChange)}</td>
+      <td class="col-num radar-mcap">${formatMarketCap(r.marketCap)}</td>
+    `;
+    frag.appendChild(tr);
+  }
+  el.radarBody.innerHTML = '';
+  el.radarBody.appendChild(frag);
+  updateRadarSortArrows();
+}
+
+function updateRadarSortArrows() {
+  el.radarSortableHeaders.forEach((th) => {
+    const isActive = th.dataset.col === state.radarSortBy;
+    th.classList.toggle('sort-active', isActive);
+    const icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = isActive ? (state.radarSortDir === 'asc' ? '↑' : '↓') : '⇕';
+  });
+}
+
+/* ============================================================
    UI STATE
    ============================================================ */
 function setLoading(isLoading) {
   el.skeletonLoader.classList.toggle('hidden', !isLoading);
   el.stocksView.classList.add('hidden');
   el.heatmapView.classList.add('hidden');
+  el.radarView.classList.add('hidden');
   el.errorBanner.classList.add('hidden');
   if (isLoading) buildSkeletonRows(12);
 }
@@ -457,6 +551,7 @@ function setError(message) {
   el.skeletonLoader.classList.add('hidden');
   el.stocksView.classList.add('hidden');
   el.heatmapView.classList.add('hidden');
+  el.radarView.classList.add('hidden');
   el.errorMessage.textContent = message;
   el.errorBanner.classList.remove('hidden');
 }
@@ -467,18 +562,23 @@ function renderCurrentView() {
 
   const isStocks  = state.activeView === 'stocks';
   const isHeatmap = state.activeView === 'heatmap';
+  const isRadar   = state.activeView === 'radar';
 
   el.stocksView.classList.toggle('hidden', !isStocks);
   el.heatmapView.classList.toggle('hidden', !isHeatmap);
-
-  const visibleStocks = filterAndSortStocks(state.stocks);
+  el.radarView.classList.toggle('hidden', !isRadar);
 
   if (isStocks) {
+    const visibleStocks = filterAndSortStocks(state.stocks);
     renderStocksTable(visibleStocks);
     updateSummary(visibleStocks);
-  } else {
+  } else if (isHeatmap) {
     renderHeatmapCards(state.heatmap);
     updateSummary(state.stocks);
+  } else if (isRadar) {
+    renderRadarTable(state.radar);
+    // Show radar summary: map pctChange → dailyChange for the shared summary component
+    updateSummary(state.radar.map((r) => ({ ...r, securityId: r.symbol, dailyChange: r.pctChange })));
   }
 }
 
@@ -527,6 +627,7 @@ async function loadData(forceRefresh = false) {
     if (hit) {
       state.stocks      = hit.data.stocks;
       state.heatmap     = hit.data.heatmap;
+      state.radar       = hit.data.radar || [];
       state.lastFetched = new Date(hit.timestamp);
       updateTimestamp();
       renderCurrentView();
@@ -536,31 +637,27 @@ async function loadData(forceRefresh = false) {
   }
 
   try {
-    let stocks, heatmap;
+    let data; // { stocks, heatmap, radar }
 
     // ─ Try the secure API proxy first ──────────────────────────────
     const apiRes = await fetch('/api/data').catch(() => ({ status: 0, ok: false }));
 
     if (apiRes.ok) {
       // ✅ Vercel / vercel dev — data from server, sheet URL never exposed
-      const json = await apiRes.json();
-      stocks  = json.stocks;
-      heatmap = json.heatmap;
+      data = await apiRes.json();
     } else if (apiRes.status === 404 || apiRes.status === 0) {
       // ⚠️ API not available (local Python server, file://, etc.)
-      // Fall back to fetching CSVs directly — acceptable for dev only
       console.info('[HeatmapDashboard] /api/data not found — falling back to direct CSV fetch (local dev mode)');
-      const fallback = await _fetchFromSheets();
-      stocks  = fallback.stocks;
-      heatmap = fallback.heatmap;
+      data = await _fetchFromSheets();
     } else {
       throw new Error(`API error: HTTP ${apiRes.status}`);
     }
 
-    state.stocks      = stocks;
-    state.heatmap     = heatmap;
+    state.stocks      = data.stocks  || [];
+    state.heatmap     = data.heatmap || [];
+    state.radar       = data.radar   || [];
     state.lastFetched = new Date();
-    saveCache({ stocks, heatmap });
+    saveCache({ stocks: state.stocks, heatmap: state.heatmap, radar: state.radar });
     updateTimestamp();
     renderCurrentView();
   } catch (err) {
@@ -651,6 +748,27 @@ function bindEventListeners() {
     const card = e.target.closest('.heatmap-card.copyable');
     if (!card) return;
     copyToClipboard(card.dataset.copy || '');
+  });
+
+  // Copy to clipboard — radar table
+  el.radarBody.addEventListener('click', (e) => {
+    const td = e.target.closest('td.copyable');
+    if (!td) return;
+    copyToClipboard(td.dataset.copy || td.textContent.trim());
+  });
+
+  // Radar column header click sort
+  el.radarSortableHeaders.forEach((th) => {
+    th.addEventListener('click', () => {
+      const col = th.dataset.col;
+      if (state.radarSortBy === col) {
+        state.radarSortDir = state.radarSortDir === 'asc' ? 'desc' : 'asc';
+      } else {
+        state.radarSortBy  = col;
+        state.radarSortDir = col === 'symbol' ? 'asc' : 'desc';
+      }
+      renderCurrentView();
+    });
   });
 }
 

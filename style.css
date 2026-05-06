@@ -523,6 +523,30 @@ td.copyable:hover::after {
   color: var(--loss);
 }
 
+/* ── Market Sentiment chip ─────────────────────────────────── */
+#marketSentiment {
+  font-size: 1.15rem;
+  letter-spacing: 0.01em;
+}
+
+#marketSentiment[data-sentiment="bullish"] { color: var(--gain); }
+#marketSentiment[data-sentiment="bearish"] { color: var(--loss); }
+#marketSentiment[data-sentiment="neutral"] { color: #f59e0b; } /* amber */
+
+/* ── Adv / Decliners split colours ───────────────────────────*/
+#advDecliners {
+  font-size: 1.05rem;
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  flex-wrap: wrap;
+}
+
+.adv-count  { color: var(--gain); font-weight: 800; }
+.dec-count  { color: var(--loss); font-weight: 800; }
+.adv-sep    { color: var(--text-muted); font-weight: 400; }
+.unch-count { color: var(--text-muted); font-size: 0.82em; font-weight: 400; }
+
 /* ============================================================
    CONTENT PANEL
    ============================================================ */

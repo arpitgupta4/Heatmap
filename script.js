@@ -121,8 +121,10 @@ const el = {
   errorMessage:           document.getElementById('errorMessage'),
   errorRetry:             document.getElementById('errorRetry'),
   totalCount:             document.getElementById('totalCount'),
-  bestPerformer:          document.getElementById('bestPerformer'),
-  worstPerformer:         document.getElementById('worstPerformer'),
+  bestPerformer:          null, // replaced by marketSentiment
+  worstPerformer:         null, // replaced by advDecliners
+  marketSentiment:        document.getElementById('marketSentiment'),
+  advDecliners:           document.getElementById('advDecliners'),
   avgChange:              document.getElementById('avgChange'),
   topGainers:             document.getElementById('topGainers'),
   topLosers:              document.getElementById('topLosers'),
@@ -249,24 +251,31 @@ function loadCache() {
    ============================================================ */
 function summaryFromStocks(stocks) {
   const total = stocks.length;
-  if (!total) return { total: 0, avg: '—', best: '—', worst: '—', topGainers: [], topLosers: [], pctGain: 0 };
+  if (!total) return {
+    total: 0, avg: '—', sentiment: 'neutral', sentimentLabel: '—',
+    adv: 0, dec: 0, unch: 0, topGainers: [], topLosers: [], pctGain: 0,
+  };
 
-  const sum = stocks.reduce((acc, s) => acc + s.dailyChange, 0);
-  const avg = (sum / total).toFixed(2);
+  const sum  = stocks.reduce((acc, s) => acc + s.dailyChange, 0);
+  const avg  = (sum / total).toFixed(2);
   const sorted = [...stocks].sort((a, b) => b.dailyChange - a.dailyChange);
-  const gainers = stocks.filter((s) => s.dailyChange > 0).length;
-  const pctGain = Math.round((gainers / total) * 100);
 
-  const label = (s) => `${s.securityId || s.name} (${formatChange(s.dailyChange)})`;
+  const adv  = stocks.filter((s) => s.dailyChange > 0).length;
+  const dec  = stocks.filter((s) => s.dailyChange < 0).length;
+  const unch = total - adv - dec;
+  const pctGain = Math.round((adv / total) * 100);
+
+  // Sentiment: Bullish ≥ 60% gainers, Bearish ≤ 40%, else Neutral
+  let sentiment, sentimentLabel;
+  if (pctGain >= 60)      { sentiment = 'bullish';  sentimentLabel = '🟢 Bullish';  }
+  else if (pctGain <= 40) { sentiment = 'bearish';  sentimentLabel = '🔴 Bearish';  }
+  else                    { sentiment = 'neutral';  sentimentLabel = '🟡 Neutral';  }
 
   return {
-    total,
-    avg: `${avg}%`,
-    best:       sorted[0]                 ? label(sorted[0])                 : '—',
-    worst:      sorted[sorted.length - 1] ? label(sorted[sorted.length - 1]) : '—',
+    total, avg: `${avg}%`, sentiment, sentimentLabel,
+    adv, dec, unch, pctGain,
     topGainers: sorted.slice(0, 5),
     topLosers:  sorted.slice(-5).reverse(),
-    pctGain,
   };
 }
 
@@ -336,15 +345,24 @@ function renderSentimentBar(pctGain) {
    ============================================================ */
 function updateSummary(stocks) {
   const s = summaryFromStocks(stocks);
-  el.totalCount.textContent     = s.total;
-  el.avgChange.textContent      = s.avg;
-  el.bestPerformer.textContent  = s.best;
-  el.worstPerformer.textContent = s.worst;
+  el.totalCount.textContent = s.total;
+  el.avgChange.textContent  = s.avg;
+
+  // Market Sentiment chip
+  el.marketSentiment.textContent       = s.sentimentLabel;
+  el.marketSentiment.dataset.sentiment = s.sentiment; // CSS colours via attr
+
+  // Adv / Decliners  e.g.  "842 ▲ / 612 ▼  (114 —)"
+  el.advDecliners.innerHTML =
+    `<span class="adv-count">${s.adv} ▲</span>` +
+    `<span class="adv-sep"> / </span>` +
+    `<span class="dec-count">${s.dec} ▼</span>` +
+    (s.unch ? `<span class="unch-count"> (${s.unch} —)</span>` : '');
 
   renderSentimentBar(s.pctGain);
 
   el.topGainers.innerHTML = s.topGainers.map((item) => {
-    const sym = item.securityId || item.name;
+    const sym = item.securityId || item.symbol || item.name;
     return `<li class="mover-item">
       <span class="mover-symbol">${sym}</span>
       <span class="change-badge gain">${formatChange(item.dailyChange)}</span>
@@ -352,7 +370,7 @@ function updateSummary(stocks) {
   }).join('');
 
   el.topLosers.innerHTML = s.topLosers.map((item) => {
-    const sym = item.securityId || item.name;
+    const sym = item.securityId || item.symbol || item.name;
     return `<li class="mover-item">
       <span class="mover-symbol">${sym}</span>
       <span class="change-badge loss">${formatChange(item.dailyChange)}</span>

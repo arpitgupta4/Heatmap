@@ -40,7 +40,7 @@ function _parseNumber(value) {
 function _normalizeRadarRow(row) {
   return {
     symbol:    (row['Symbol']    || '').trim(),
-    prevClose: _parseNumber(row['Prev Close'] || 0),
+    high:      _parseNumber(row['High']      || 0),
     ltp:       _parseNumber(row['LTP']       || 0),
     change:    _parseNumber(row['Change']    || 0),
     pctChange: _parseNumber(row['%Change']   || 0),
@@ -567,11 +567,11 @@ function renderRadarTable(items) {
   const page = filtered.slice(0, state.visibleCount);
   const frag = document.createDocumentFragment();
   for (const r of page) {
-    const ltpClass = r.ltp > r.prevClose ? 'gain' : r.ltp < r.prevClose ? 'loss' : '';
+    const ltpClass = r.ltp > r.high ? 'gain' : r.ltp < r.high ? 'loss' : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-symbol copyable" data-copy="${r.symbol}">${r.symbol}</td>
-      <td class="col-num">${formatPrice(r.prevClose)}</td>
+      <td class="col-num">${formatPrice(r.high)}</td>
       <td class="col-num ${ltpClass}">${formatPrice(r.ltp)}</td>
       <td class="col-num ${r.change > 0 ? 'gain' : r.change < 0 ? 'loss' : ''}">${r.change > 0 ? '+' : ''}${r.change.toFixed(2)}</td>
       <td class="col-num">${changeBadge(r.pctChange)}</td>

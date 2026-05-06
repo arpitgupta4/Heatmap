@@ -1,7 +1,7 @@
 /* ============================================================
    CONFIG
    ============================================================ */
-const CACHE_KEY = 'heatmapDataCache_v4'; // bump → forces cache clear after radar added
+const CACHE_KEY = 'heatmapDataCache_v5';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 // Direct sheet URLs — used ONLY as a local-dev fallback when /api/data

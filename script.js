@@ -3,7 +3,7 @@
    ============================================================ */
 const CACHE_KEY = 'heatmapDataCache_v5';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-const PAGE_SIZE = 50; // rows rendered per page — keeps mobile DOM light
+const PAGE_SIZE = 250; // rows rendered per page
 
 // Direct sheet URLs — used ONLY as a local-dev fallback when /api/data
 // is not available (e.g. plain Python server). On Vercel these are never
@@ -156,8 +156,13 @@ const state = {
   lastFetched:    null,
   radarSortBy:    'pctChange',
   radarSortDir:   'desc',
-  visibleCount:   PAGE_SIZE, // pagination — grows on "Load More"
+  visibleCount:   PAGE_SIZE,
+  _dirty:         { stocks: true, heatmap: true, radar: true }, // tracks which views need re-render
 };
+
+function markAllDirty() {
+  state._dirty.stocks = state._dirty.heatmap = state._dirty.radar = true;
+}
 
 /* ============================================================
    UTILS
@@ -638,16 +643,21 @@ function renderCurrentView() {
   el.heatmapView.classList.toggle('hidden', !isHeatmap);
   el.radarView.classList.toggle('hidden', !isRadar);
 
-  if (isStocks) {
+  // Only re-render the active view if its data is dirty (filters/sort/data changed).
+  // Tab switching without data changes just shows/hides — instant.
+  if (isStocks && state._dirty.stocks) {
     const visibleStocks = filterAndSortStocks(state.stocks);
-    renderStocksTable(visibleStocks);     // paginated internally
-    updateSummary(visibleStocks);         // summary uses full filtered set
-  } else if (isHeatmap) {
+    renderStocksTable(visibleStocks);
+    updateSummary(visibleStocks);
+    state._dirty.stocks = false;
+  } else if (isHeatmap && state._dirty.heatmap) {
     renderHeatmapCards(state.heatmap);
     updateSummary(state.stocks);
-  } else if (isRadar) {
-    renderRadarTable(state.radar);        // paginated internally
+    state._dirty.heatmap = false;
+  } else if (isRadar && state._dirty.radar) {
+    renderRadarTable(state.radar);
     updateSummary(state.radar.map((r) => ({ ...r, securityId: r.symbol, dailyChange: r.pctChange })));
+    state._dirty.radar = false;
   }
 }
 
@@ -727,6 +737,7 @@ async function loadData(forceRefresh = false) {
     state.radar       = data.radar   || [];
     state.lastFetched = new Date();
     saveCache({ stocks: state.stocks, heatmap: state.heatmap, radar: state.radar });
+    markAllDirty();
     updateTimestamp();
     renderCurrentView();
   } catch (err) {
@@ -745,13 +756,15 @@ function bindEventListeners() {
   const _debouncedRender = debounce(() => renderCurrentView(), 150);
   el.searchInput.addEventListener('input', (e) => {
     state.query = e.target.value.trim();
-    state.visibleCount = PAGE_SIZE; // reset pagination on new search
+    state.visibleCount = PAGE_SIZE;
+    markAllDirty();
     _debouncedRender();
   });
 
   el.filterSelect.addEventListener('change', (e) => {
     state.filter = e.target.value;
     state.visibleCount = PAGE_SIZE;
+    markAllDirty();
     renderCurrentView();
   });
 
@@ -760,12 +773,14 @@ function bindEventListeners() {
     el.directionSelect.value = 'desc';
     state.sortDir = 'desc';
     state.visibleCount = PAGE_SIZE;
+    markAllDirty();
     renderCurrentView();
   });
 
   el.directionSelect.addEventListener('change', (e) => {
     state.sortDir = e.target.value;
     state.visibleCount = PAGE_SIZE;
+    markAllDirty();
     renderCurrentView();
   });
 
@@ -791,6 +806,7 @@ function bindEventListeners() {
       }
       el.sortSelect.value      = state.sortBy;
       el.directionSelect.value = state.sortDir;
+      state._dirty.stocks = true;
       renderCurrentView();
     });
   });
@@ -844,6 +860,7 @@ function bindEventListeners() {
         state.radarSortBy  = col;
         state.radarSortDir = col === 'symbol' ? 'asc' : 'desc';
       }
+      state._dirty.radar = true;
       renderCurrentView();
     });
   });

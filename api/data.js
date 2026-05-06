@@ -68,11 +68,12 @@ function parseNumber(value) {
 function normalizeRadarRow(row) {
   return {
     symbol:    (row['Symbol']    || '').trim(),
-    high:      parseNumber(row['High']      || 0),
-    ltp:       parseNumber(row['LTP']       || 0),
-    change:    parseNumber(row['Change']    || 0),
-    pctChange: parseNumber(row['%Change']   || 0),
-    marketCap: parseNumber(row['MarketCap'] || 0),
+    high:      parseNumber(row['High']       || 0),
+    prevClose: parseNumber(row['Prev Close'] || 0),
+    ltp:       parseNumber(row['LTP']        || 0),
+    change:    parseNumber(row['Change']     || 0),
+    pctChange: parseNumber(row['%Change']    || 0),
+    marketCap: parseNumber(row['MarketCap']  || 0),
   };
 }
 

@@ -3,6 +3,7 @@
    ============================================================ */
 const CACHE_KEY = 'heatmapDataCache_v5';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const PAGE_SIZE = 50; // rows rendered per page — keeps mobile DOM light
 
 // Direct sheet URLs — used ONLY as a local-dev fallback when /api/data
 // is not available (e.g. plain Python server). On Vercel these are never
@@ -155,6 +156,7 @@ const state = {
   lastFetched:    null,
   radarSortBy:    'pctChange',
   radarSortDir:   'desc',
+  visibleCount:   PAGE_SIZE, // pagination — grows on "Load More"
 };
 
 /* ============================================================
@@ -163,6 +165,11 @@ const state = {
 function formatChange(value) {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(2)}%`;
+}
+
+function debounce(fn, ms) {
+  let id;
+  return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); };
 }
 
 function formatPrice(v)     { return `₹${v.toFixed(2)}`; }
@@ -400,8 +407,9 @@ function renderStocksTable(stocks) {
     return;
   }
 
+  const page = stocks.slice(0, state.visibleCount);
   const frag = document.createDocumentFragment();
-  for (const s of stocks) {
+  for (const s of page) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td class="col-symbol copyable" data-copy="${s.securityId}">${s.securityId}</td>
@@ -413,9 +421,28 @@ function renderStocksTable(stocks) {
     `;
     frag.appendChild(tr);
   }
+
+  // "Load More" row if there are more
+  if (stocks.length > state.visibleCount) {
+    const more = document.createElement('tr');
+    more.innerHTML = `<td colspan="6" class="load-more-cell">
+      <button class="load-more-btn" id="loadMoreStocks">
+        Show more (${stocks.length - state.visibleCount} remaining)
+      </button>
+    </td>`;
+    frag.appendChild(more);
+  }
+
   el.stocksBody.innerHTML = '';
   el.stocksBody.appendChild(frag);
   updateSortArrows();
+
+  // Bind load-more
+  const btn = document.getElementById('loadMoreStocks');
+  if (btn) btn.addEventListener('click', () => {
+    state.visibleCount += PAGE_SIZE;
+    renderCurrentView();
+  });
 }
 
 /* ============================================================
@@ -532,10 +559,9 @@ function renderRadarTable(items) {
     return state.radarSortDir === 'asc' ? cmp : -cmp;
   });
 
+  const page = filtered.slice(0, state.visibleCount);
   const frag = document.createDocumentFragment();
-  for (const r of filtered) {
-    const up   = r.pctChange > 0;
-    const down = r.pctChange < 0;
+  for (const r of page) {
     const ltpClass = r.ltp > r.prevClose ? 'gain' : r.ltp < r.prevClose ? 'loss' : '';
     const tr = document.createElement('tr');
     tr.innerHTML = `
@@ -548,9 +574,26 @@ function renderRadarTable(items) {
     `;
     frag.appendChild(tr);
   }
+
+  if (filtered.length > state.visibleCount) {
+    const more = document.createElement('tr');
+    more.innerHTML = `<td colspan="6" class="load-more-cell">
+      <button class="load-more-btn" id="loadMoreRadar">
+        Show more (${filtered.length - state.visibleCount} remaining)
+      </button>
+    </td>`;
+    frag.appendChild(more);
+  }
+
   el.radarBody.innerHTML = '';
   el.radarBody.appendChild(frag);
   updateRadarSortArrows();
+
+  const btn = document.getElementById('loadMoreRadar');
+  if (btn) btn.addEventListener('click', () => {
+    state.visibleCount += PAGE_SIZE;
+    renderCurrentView();
+  });
 }
 
 function updateRadarSortArrows() {
@@ -597,14 +640,13 @@ function renderCurrentView() {
 
   if (isStocks) {
     const visibleStocks = filterAndSortStocks(state.stocks);
-    renderStocksTable(visibleStocks);
-    updateSummary(visibleStocks);
+    renderStocksTable(visibleStocks);     // paginated internally
+    updateSummary(visibleStocks);         // summary uses full filtered set
   } else if (isHeatmap) {
     renderHeatmapCards(state.heatmap);
     updateSummary(state.stocks);
   } else if (isRadar) {
-    renderRadarTable(state.radar);
-    // Show radar summary: map pctChange → dailyChange for the shared summary component
+    renderRadarTable(state.radar);        // paginated internally
     updateSummary(state.radar.map((r) => ({ ...r, securityId: r.symbol, dailyChange: r.pctChange })));
   }
 }
@@ -700,13 +742,16 @@ async function loadData(forceRefresh = false) {
    EVENT BINDING
    ============================================================ */
 function bindEventListeners() {
+  const _debouncedRender = debounce(() => renderCurrentView(), 150);
   el.searchInput.addEventListener('input', (e) => {
     state.query = e.target.value.trim();
-    renderCurrentView();
+    state.visibleCount = PAGE_SIZE; // reset pagination on new search
+    _debouncedRender();
   });
 
   el.filterSelect.addEventListener('change', (e) => {
     state.filter = e.target.value;
+    state.visibleCount = PAGE_SIZE;
     renderCurrentView();
   });
 
@@ -714,11 +759,13 @@ function bindEventListeners() {
     state.sortBy = e.target.value;
     el.directionSelect.value = 'desc';
     state.sortDir = 'desc';
+    state.visibleCount = PAGE_SIZE;
     renderCurrentView();
   });
 
   el.directionSelect.addEventListener('change', (e) => {
     state.sortDir = e.target.value;
+    state.visibleCount = PAGE_SIZE;
     renderCurrentView();
   });
 
@@ -726,7 +773,10 @@ function bindEventListeners() {
   el.errorRetry.addEventListener('click',    () => loadData(true));
 
   el.tabButtons.forEach((btn) => {
-    btn.addEventListener('click', () => setActiveView(btn.dataset.view));
+    btn.addEventListener('click', () => {
+      state.visibleCount = PAGE_SIZE;
+      setActiveView(btn.dataset.view);
+    });
   });
 
   // Column header click sorting

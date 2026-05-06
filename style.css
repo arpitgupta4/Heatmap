@@ -554,6 +554,51 @@ td.copyable:hover::after {
   min-height: 440px;
 }
 
+/* ============================================================
+   LOAD MORE BUTTON (pagination)
+   ============================================================ */
+.load-more-cell {
+  text-align: center;
+  padding: 16px !important;
+  border: none !important;
+}
+
+.load-more-btn {
+  display: inline-block;
+  padding: 10px 28px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.30);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease), transform 0.1s ease;
+}
+
+.load-more-btn:hover {
+  background: rgba(99, 102, 241, 0.24);
+}
+
+.load-more-btn:active {
+  transform: scale(0.97);
+}
+
+/* ── Mobile GPU perf: strip heavy effects ≤768px ─────────── */
+@media (max-width: 768px) {
+  .stocks-table thead th,
+  .stocks-table tbody td:first-child {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+
+  /* Disable row hover transitions on mobile (saves paint) */
+  .stocks-table tbody tr {
+    transition: none;
+  }
+}
+
 .hidden {
   display: none !important;
 }

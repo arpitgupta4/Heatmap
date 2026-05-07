@@ -718,22 +718,47 @@ function renderCurrentView() {
   el.heatmapView.classList.toggle('hidden', !isHeatmap);
   el.radarView.classList.toggle('hidden', !isRadar);
 
-  // Only re-render the active view if its data is dirty (filters/sort/data changed).
-  // Tab switching without data changes just shows/hides — instant.
-  if (isStocks && state._dirty.stocks) {
-    const visibleStocks = filterAndSortStocks(state.stocks);
-    renderStocksTable(visibleStocks);
-    updateSummary(visibleStocks);
-    state._dirty.stocks = false;
-  } else if (isHeatmap && state._dirty.heatmap) {
-    renderHeatmapCards(state.heatmap);
+  // Table re-render is expensive — only when data/filters changed.
+  // Summary cards are cheap — always update on tab switch so numbers stay correct.
+  if (isStocks) {
+    if (state._dirty.stocks) {
+      state._filteredStocks = filterAndSortStocks(state.stocks);
+      renderStocksTable(state._filteredStocks);
+      state._dirty.stocks = false;
+    }
+    updateSummary(state._filteredStocks || filterAndSortStocks(state.stocks));
+  } else if (isHeatmap) {
+    if (state._dirty.heatmap) {
+      renderHeatmapCards(state.heatmap);
+      state._dirty.heatmap = false;
+    }
     updateSummary(state.stocks);
-    state._dirty.heatmap = false;
-  } else if (isRadar && state._dirty.radar) {
-    renderRadarTable(state.radar);
+  } else if (isRadar) {
+    if (state._dirty.radar) {
+      renderRadarTable(state.radar);
+      state._dirty.radar = false;
+    }
     updateRadarSummary(state.radarSummary);
-    state._dirty.radar = false;
   }
+}
+
+// Pre-render inactive tabs in the background so first switch is instant
+function preRenderHidden() {
+  requestAnimationFrame(() => {
+    if (state._dirty.stocks && state.activeView !== 'stocks') {
+      state._filteredStocks = state._filteredStocks || filterAndSortStocks(state.stocks);
+      renderStocksTable(state._filteredStocks);
+      state._dirty.stocks = false;
+    }
+    if (state._dirty.heatmap && state.activeView !== 'heatmap') {
+      renderHeatmapCards(state.heatmap);
+      state._dirty.heatmap = false;
+    }
+    if (state._dirty.radar && state.activeView !== 'radar') {
+      renderRadarTable(state.radar);
+      state._dirty.radar = false;
+    }
+  });
 }
 
 function setActiveView(view) {
@@ -784,8 +809,10 @@ async function loadData(forceRefresh = false) {
       state.radar        = hit.data.radar || [];
       state.radarSummary = hit.data.radarSummary || {};
       state.lastFetched  = new Date(hit.timestamp);
+      state._filteredStocks = filterAndSortStocks(state.stocks);
       updateTimestamp();
       renderCurrentView();
+      preRenderHidden();  // pre-build off-screen tabs
       el.refreshButton.classList.remove('loading');
       return;
     }
@@ -813,10 +840,12 @@ async function loadData(forceRefresh = false) {
     state.radar        = data.radar        || [];
     state.radarSummary = data.radarSummary || {};
     state.lastFetched  = new Date();
+    state._filteredStocks = filterAndSortStocks(state.stocks);
     saveCache({ stocks: state.stocks, heatmap: state.heatmap, radar: state.radar, radarSummary: state.radarSummary });
     markAllDirty();
     updateTimestamp();
     renderCurrentView();
+    preRenderHidden();  // pre-build off-screen tabs
   } catch (err) {
     console.error('[HeatmapDashboard] Error:', err);
     setError('Unable to load data. Check your network or try refreshing.');

@@ -880,36 +880,42 @@ function _renderDateSection(dateKey, groupedByDate, stockMap) {
     return;
   }
 
-  const cards = items.map(r => {
+  const rows = items.map(r => {
     const s = stockMap[r.symbol] || {};
     const pct = s.dailyChange;
-    const absChange = s.change;
-    const color = pct > 0 ? 'gain' : pct < 0 ? 'loss' : 'neutral';
-    const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '';
-    const pctText = pct != null ? `${arrow} ${Math.abs(pct).toFixed(2)}%` : '—';
-    const changeText = absChange != null ? (absChange > 0 ? `+${absChange}` : absChange) : '—';
+    const pctHtml = pct != null ? changeBadge(pct) : '—';
     
-    return `<div class="result-card">
-      <div class="result-card-header">
-        <span class="result-symbol" onclick="navigator.clipboard.writeText('${r.symbol}')" title="Copy symbol">${r.symbol}</span>
-        <span class="result-pct ${color}">${pctText}</span>
-      </div>
-      <div class="result-company" style="color: var(--text-primary); font-weight: 600;">
-        Change: <span style="color: var(--${color})">${changeText}</span> &nbsp;|&nbsp; %Change: <span style="color: var(--${color})">${pctText}</span>
-      </div>
-      <div class="result-meta">
-        ${s.name ? `<span class="result-tag">${s.name}</span>` : ''}
-        ${s.industry ? `<span class="result-tag">${s.industry}</span>` : ''}
-        ${s.group ? `<span class="result-tag">${s.group}</span>` : ''}
-        ${s.subgroup ? `<span class="result-tag">${s.subgroup}</span>` : ''}
-      </div>
-      <div class="result-purpose">${r.purpose}</div>
-    </div>`;
+    return `<tr>
+      <td class="col-symbol copyable" data-copy="${r.symbol}">${r.symbol}</td>
+      <td class="copyable" data-copy="${s.name || ''}">${s.name || '—'}</td>
+      <td class="copyable" data-copy="${s.industry || ''}">${s.industry || '—'}</td>
+      <td class="copyable" data-copy="${s.group || ''}">${s.group || '—'}</td>
+      <td class="copyable" data-copy="${s.subgroup || ''}">${s.subgroup || '—'}</td>
+      <td class="copyable" style="max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${r.purpose || ''}" data-copy="${r.purpose || ''}">${r.purpose || '—'}</td>
+      <td class="col-change">${pctHtml}</td>
+    </tr>`;
   }).join('');
 
   el.resultsDateSection.innerHTML = `
     <div class="results-date-header">${items.length} result${items.length > 1 ? 's' : ''} on ${dateKey}</div>
-    <div class="results-cards-grid">${cards}</div>
+    <div class="table-wrapper" style="animation: fade-in 0.4s ease-out forwards;">
+      <table class="stocks-table" aria-label="Results list">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Sector</th>
+            <th>Industry</th>
+            <th>Group</th>
+            <th>Subgroup</th>
+            <th>Purpose</th>
+            <th style="text-align:right">% Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
@@ -1187,6 +1193,13 @@ function bindEventListeners() {
 
   // Copy to clipboard — radar table
   el.radarBody.addEventListener('click', (e) => {
+    const td = e.target.closest('td.copyable');
+    if (!td) return;
+    copyToClipboard(td.dataset.copy || td.textContent.trim());
+  });
+
+  // Copy to clipboard — results table
+  el.resultsDateSection.addEventListener('click', (e) => {
     const td = e.target.closest('td.copyable');
     if (!td) return;
     copyToClipboard(td.dataset.copy || td.textContent.trim());

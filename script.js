@@ -97,8 +97,12 @@ function _buildHeatmapItems(text) {
 // Parse the full radar sheet — stocks from A-I, summary from K-L
 function _parseRadarSheet(csvText) {
   const rows = _parseCsvRows(csvText);
-  if (rows.length < 2) return { stocks: [], summary: {} };
+  if (rows.length < 2) return { stocks: [], summary: {}, error: false };
   const headers = rows[0];
+
+  if (headers[0] === '#VALUE!' || headers[0] === '#N/A' || headers[0] === '#ERROR!') {
+    return { stocks: [], summary: {}, error: true };
+  }
 
   const sm = {};
   if (headers[10]) sm[headers[10]] = (headers[11] || '').trim();

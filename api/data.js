@@ -128,6 +128,8 @@ function normalizeStockRow(row) {
       row['%Change'] || row['Daily Chang'] || row['Daily Change'] ||
       row['% Change'] || row['Daily %change'] || ''
     ),
+    change: parseNumber(row['Change'] || 0),
+    ltp: parseNumber(row['LTP'] || row['Close'] || row['Last Price'] || 0)
   };
 }
 

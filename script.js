@@ -61,6 +61,8 @@ function _normalizeStockRow(row) {
       row['%Change'] || row['Daily Chang'] || row['Daily Change'] ||
       row['% Change'] || row['Daily %change'] || ''
     ),
+    change: _parseNumber(row['Change'] || 0),
+    ltp: _parseNumber(row['LTP'] || row['Close'] || row['Last Price'] || 0)
   };
 }
 
@@ -881,14 +883,20 @@ function _renderDateSection(dateKey, groupedByDate, stockMap) {
   const cards = items.map(r => {
     const s = stockMap[r.symbol] || {};
     const pct = s.dailyChange;
+    const absChange = s.change;
     const color = pct > 0 ? 'gain' : pct < 0 ? 'loss' : 'neutral';
     const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '';
+    const pctText = pct != null ? `${arrow} ${Math.abs(pct).toFixed(2)}%` : '—';
+    const changeText = absChange != null ? (absChange > 0 ? `+${absChange}` : absChange) : '—';
+    
     return `<div class="result-card">
       <div class="result-card-header">
-        <span class="result-symbol">${r.symbol}</span>
-        <span class="result-pct ${color}">${pct != null ? `${arrow} ${Math.abs(pct).toFixed(2)}%` : '—'}</span>
+        <span class="result-symbol" onclick="navigator.clipboard.writeText('${r.symbol}')" title="Copy symbol">${r.symbol}</span>
+        <span class="result-pct ${color}">${pctText}</span>
       </div>
-      <div class="result-company">${r.company}</div>
+      <div class="result-company" style="color: var(--text-primary); font-weight: 600;">
+        Change: <span style="color: var(--${color})">${changeText}</span> &nbsp;|&nbsp; %Change: <span style="color: var(--${color})">${pctText}</span>
+      </div>
       <div class="result-meta">
         ${s.sectorName ? `<span class="result-tag">${s.sectorName}</span>` : ''}
         ${s.industryNewName ? `<span class="result-tag">${s.industryNewName}</span>` : ''}

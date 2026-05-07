@@ -187,6 +187,7 @@ const el = {
   controlsPanel:          document.getElementById('controlsPanel'),
   summaryPanel:           document.getElementById('summaryPanel'),
   sentimentContainer:     document.getElementById('sentimentContainer'),
+  contentPanel:           document.getElementById('contentPanel'),
   resultsSearchInput:     document.getElementById('resultsSearchInput'),
   stocksBody:             document.getElementById('stocksBody'),
   radarBody:              document.getElementById('radarBody'),
@@ -921,6 +922,7 @@ function renderCurrentView() {
   el.controlsPanel.classList.toggle('hidden', isResults);
   el.summaryPanel.classList.toggle('hidden', isResults);
   el.sentimentContainer.classList.toggle('hidden', isResults);
+  el.contentPanel.classList.toggle('hidden', isResults);
 
   // Table re-render is expensive — only when data/filters changed.
   // Summary cards are cheap — always update on tab switch so numbers stay correct.

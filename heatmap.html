@@ -41,25 +41,18 @@
         </div>
       </header>
 
-      <!-- ── CONTROLS ───────────────────────────────────── -->
-      <section class="panel controls-panel" aria-label="View controls and filters">
-        <div class="controls-top">
-          <div class="view-tabs" role="tablist" aria-label="Dashboard view">
-            <button class="tab-button active" data-view="stocks" role="tab" aria-selected="true" id="tab-stocks">
-              Stocks
-            </button>
-            <button class="tab-button" data-view="heatmap" role="tab" aria-selected="false" id="tab-heatmap">
-              Heatmap
-            </button>
-            <button class="tab-button" data-view="radar" role="tab" aria-selected="false" id="tab-radar">
-              Radar
-            </button>
-            <button class="tab-button" data-view="results" role="tab" aria-selected="false" id="tab-results">
-              Results
-            </button>
-          </div>
+      <!-- ── TABS ───────────────────────────────────────── -->
+      <section class="panel tabs-panel" aria-label="Dashboard view">
+        <div class="view-tabs" role="tablist" aria-label="Dashboard view">
+          <button class="tab-button active" data-view="stocks" role="tab" aria-selected="true" id="tab-stocks">Stocks</button>
+          <button class="tab-button" data-view="heatmap" role="tab" aria-selected="false" id="tab-heatmap">Heatmap</button>
+          <button class="tab-button" data-view="radar" role="tab" aria-selected="false" id="tab-radar">Radar</button>
+          <button class="tab-button" data-view="results" role="tab" aria-selected="false" id="tab-results">Results</button>
         </div>
+      </section>
 
+      <!-- ── CONTROLS ───────────────────────────────────── -->
+      <section class="panel controls-panel" id="controlsPanel" aria-label="View controls and filters">
         <div class="filters-row">
           <div class="filter-field">
             <label for="searchInput">Search</label>
@@ -113,7 +106,7 @@
       </div>
 
       <!-- ── SUMMARY CARDS ──────────────────────────────── -->
-      <section class="panel summary-panel" aria-label="Market summary">
+      <section class="panel summary-panel" id="summaryPanel" aria-label="Market summary">
         <div class="summary-card">
           <span class="card-label">Stocks loaded</span>
           <strong class="card-value" id="totalCount">—</strong>
@@ -198,27 +191,15 @@
 
       <!-- ── RESULTS VIEW ────────────────────────────────── -->
       <section id="resultsView" class="panel results-panel hidden" aria-label="Results calendar">
+        <div class="results-search-wrapper">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+               stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input id="resultsSearchInput" type="search" placeholder="Search by symbol or company..." autocomplete="off" />
+        </div>
         <div class="results-date-strip" id="resultsDateStrip"></div>
         <div class="results-date-section" id="resultsDateSection"></div>
-        <div class="results-full-list">
-          <p class="panel-title">All Upcoming Results</p>
-          <div class="table-container">
-            <table class="data-table" aria-label="All results">
-              <thead>
-                <tr>
-                  <th>Date</th>
-                  <th>Symbol</th>
-                  <th>Company</th>
-                  <th>Sector</th>
-                  <th>Industry</th>
-                  <th>Purpose</th>
-                  <th>% Change</th>
-                </tr>
-              </thead>
-              <tbody id="resultsBody"></tbody>
-            </table>
-          </div>
-        </div>
       </section>
 
       <!-- ── TOP MOVERS ─────────────────────────────────── -->

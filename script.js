@@ -184,6 +184,10 @@ const el = {
   heatmapView:            document.getElementById('heatmapView'),
   radarView:              document.getElementById('radarView'),
   resultsView:            document.getElementById('resultsView'),
+  controlsPanel:          document.getElementById('controlsPanel'),
+  summaryPanel:           document.getElementById('summaryPanel'),
+  sentimentContainer:     document.getElementById('sentimentContainer'),
+  resultsSearchInput:     document.getElementById('resultsSearchInput'),
   stocksBody:             document.getElementById('stocksBody'),
   radarBody:              document.getElementById('radarBody'),
   resultsBody:            document.getElementById('resultsBody'),
@@ -228,6 +232,7 @@ const state = {
   sortDir:        'desc',
   filter:         'all',
   query:          '',
+  resultsQuery:   '',
   lastFetched:    null,
   radarSortBy:    'pctChange',
   radarSortDir:   'desc',
@@ -767,11 +772,18 @@ function _formatDateKey(d) {
 }
 
 function renderResultsView() {
-  const results = state.results;
-  if (!results.length) {
+  let results = state.results;
+  if (state.resultsQuery) {
+    const q = state.resultsQuery.toLowerCase();
+    results = results.filter(r => 
+      r.symbol.toLowerCase().includes(q) || 
+      r.company.toLowerCase().includes(q)
+    );
+  }
+
+  if (!state.results.length) {
     el.resultsDateStrip.innerHTML = '<p style="text-align:center;opacity:.5">No results data available</p>';
     el.resultsDateSection.innerHTML = '';
-    el.resultsBody.innerHTML = '';
     return;
   }
 
@@ -782,14 +794,7 @@ function renderResultsView() {
   // Parse today's date from sheet
   const today = _parseDateDMY(state.resultsToday) || new Date();
   today.setHours(0,0,0,0);
-
-  // Build date range: past 5 days + today + next 5 days
-  const datePills = [];
-  for (let i = -5; i <= 5; i++) {
-    const d = new Date(today);
-    d.setDate(d.getDate() + i);
-    datePills.push({ date: d, label: _formatDateLabel(d), key: _formatDateKey(d), isToday: i === 0 });
-  }
+  const todayKeyStr = _formatDateKey(today);
 
   // Group results by date key
   const groupedByDate = {};
@@ -801,10 +806,53 @@ function renderResultsView() {
     groupedByDate[key].push(r);
   });
 
+  let datePills = [];
+  let initialKey = todayKeyStr;
+
+  if (state.resultsQuery) {
+    // Collect all unique dates from the filtered results, sort them
+    const uniqueDates = Array.from(new Set(results.map(r => r.date)));
+    const sortedDates = uniqueDates.map(_parseDateDMY).filter(Boolean).sort((a, b) => a - b);
+    datePills = sortedDates.map((d, index) => {
+      const key = _formatDateKey(d);
+      return { 
+        date: d, 
+        label: _formatDateLabel(d), 
+        key, 
+        isToday: key === todayKeyStr,
+        isActive: index === 0 // Auto-select first result when searching
+      };
+    });
+    if (datePills.length > 0) initialKey = datePills[0].key;
+  } else {
+    // Build date range: past 5 days + today + next 5 days
+    for (let i = -5; i <= 5; i++) {
+      const d = new Date(today);
+      d.setDate(d.getDate() + i);
+      const key = _formatDateKey(d);
+      datePills.push({ 
+        date: d, 
+        label: _formatDateLabel(d), 
+        key, 
+        isToday: key === todayKeyStr,
+        isActive: key === todayKeyStr
+      });
+    }
+  }
+
+  if (datePills.length === 0 && state.resultsQuery) {
+    el.resultsDateStrip.innerHTML = '';
+    el.resultsDateSection.innerHTML = `<div class="results-empty">No results found for "${state.resultsQuery}"</div>`;
+    return;
+  }
+
   // Render date pills strip
   el.resultsDateStrip.innerHTML = datePills.map(p => {
     const count = (groupedByDate[p.key] || []).length;
-    return `<button class="results-date-pill${p.isToday ? ' active today' : ''}" data-datekey="${p.key}">
+    const classes = ['results-date-pill'];
+    if (p.isToday) classes.push('today');
+    if (p.isActive) classes.push('active');
+    return `<button class="${classes.join(' ')}" data-datekey="${p.key}">
       <span class="pill-label">${p.label}</span>
       <span class="pill-count">${count}</span>
     </button>`;
@@ -819,32 +867,7 @@ function renderResultsView() {
     });
   });
 
-  // Show today's section initially
-  const todayKey = _formatDateKey(today);
-  _renderDateSection(todayKey, groupedByDate, stockMap);
-
-  // Full table (all results, sorted by date ascending)
-  const sorted = [...results].sort((a, b) => {
-    const da = _parseDateDMY(a.date), db = _parseDateDMY(b.date);
-    return (da || 0) - (db || 0);
-  });
-
-  const rows = sorted.map(r => {
-    const s = stockMap[r.symbol] || {};
-    const pct = s.dailyChange;
-    const color = pct > 0 ? 'var(--clr-gain)' : pct < 0 ? 'var(--clr-loss)' : 'var(--clr-neutral)';
-    const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '';
-    return `<tr>
-      <td>${r.date}</td>
-      <td class="stock-name">${r.symbol}</td>
-      <td>${r.company}</td>
-      <td>${s.sectorName || '—'}</td>
-      <td>${s.industryNewName || s.iGroupName || '—'}</td>
-      <td><span class="purpose-badge">${r.purpose}</span></td>
-      <td style="color:${color}">${pct != null ? `${arrow} ${Math.abs(pct).toFixed(2)}%` : '—'}</td>
-    </tr>`;
-  }).join('');
-  el.resultsBody.innerHTML = rows;
+  _renderDateSection(initialKey, groupedByDate, stockMap);
 }
 
 function _renderDateSection(dateKey, groupedByDate, stockMap) {
@@ -894,6 +917,10 @@ function renderCurrentView() {
   el.heatmapView.classList.toggle('hidden', !isHeatmap);
   el.radarView.classList.toggle('hidden', !isRadar);
   el.resultsView.classList.toggle('hidden', !isResults);
+
+  el.controlsPanel.classList.toggle('hidden', isResults);
+  el.summaryPanel.classList.toggle('hidden', isResults);
+  el.sentimentContainer.classList.toggle('hidden', isResults);
 
   // Table re-render is expensive — only when data/filters changed.
   // Summary cards are cheap — always update on tab switch so numbers stay correct.
@@ -1050,12 +1077,21 @@ async function loadData(forceRefresh = false) {
    ============================================================ */
 function bindEventListeners() {
   const _debouncedRender = debounce(() => renderCurrentView(), 150);
+  const _debouncedResultsRender = debounce(() => renderResultsView(), 150);
+
   el.searchInput.addEventListener('input', (e) => {
     state.query = e.target.value.trim();
     state.visibleCount = PAGE_SIZE;
     markAllDirty();
     _debouncedRender();
   });
+
+  if (el.resultsSearchInput) {
+    el.resultsSearchInput.addEventListener('input', (e) => {
+      state.resultsQuery = e.target.value.trim();
+      _debouncedResultsRender();
+    });
+  }
 
   el.filterSelect.addEventListener('change', (e) => {
     state.filter = e.target.value;

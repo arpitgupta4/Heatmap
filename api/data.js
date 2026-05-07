@@ -77,6 +77,42 @@ function normalizeRadarRow(row) {
   };
 }
 
+// Parse the full radar sheet — stocks from A-I, summary from K-L
+function parseRadarSheet(csvText) {
+  const rows = parseCsvRows(csvText);
+  if (rows.length < 2) return { stocks: [], summary: {} };
+  const headers = rows[0];
+
+  // Extract summary key-value pairs from columns K (10) and L (11)
+  const sm = {};
+  if (headers[10]) sm[headers[10]] = (headers[11] || '').trim();
+  for (let i = 1; i <= 5 && i < rows.length; i++) {
+    const k = (rows[i]?.[10] || '').trim();
+    const v = (rows[i]?.[11] || '').trim();
+    if (k) sm[k] = v;
+  }
+
+  // Build stock objects from columns 0-8
+  const stocks = rows.slice(1).map((row) => {
+    const obj = {};
+    for (let i = 0; i <= 8 && i < headers.length; i++) {
+      obj[headers[i] || `col_${i}`] = (row[i] || '').trim();
+    }
+    return normalizeRadarRow(obj);
+  }).filter((r) => r.symbol);
+
+  return {
+    stocks,
+    summary: {
+      totalStocks: parseInt(sm['Total Stocks']) || stocks.length,
+      pctChange:   parseFloat(String(sm['%Change']).replace('%', '')) || 0,
+      advance:     parseInt(sm['Advance']) || 0,
+      decliners:   parseInt(sm['Decliners']) || 0,
+      sentiment:   sm['Market Sentiment'] || 'Neutral',
+    },
+  };
+}
+
 function normalizeStockRow(row) {
   return {
     securityId:  row['Security Id'] || row['Name'] || '',
@@ -142,20 +178,19 @@ export default async function handler(req, res) {
 
     const stocks  = parseCsvToObjects(stocksCsv).map(normalizeStockRow);
     const heatmap = buildHeatmapItems(heatmapCsv);
-    const radar   = parseCsvToObjects(radarCsv).map(normalizeRadarRow);
+    const radarSheet = parseRadarSheet(radarCsv);
 
     // Edge cache for 5 min, serve stale for 10 min while revalidating.
-    // Vercel's CDN will cache this globally — repeat requests within 5 min
-    // return instantly from the nearest edge node without invoking this function.
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     res.setHeader('Content-Type', 'application/json');
 
     return res.status(200).json({
       stocks,
       heatmap,
-      radar,
+      radar:        radarSheet.stocks,
+      radarSummary: radarSheet.summary,
       cachedAt: Date.now(),
-      counts: { stocks: stocks.length, heatmap: heatmap.length, radar: radar.length },
+      counts: { stocks: stocks.length, heatmap: heatmap.length, radar: radarSheet.stocks.length },
     });
   } catch (err) {
     console.error('[api/data] Error:', err.message);

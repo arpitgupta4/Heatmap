@@ -1,7 +1,7 @@
 /* ============================================================
    CONFIG
    ============================================================ */
-const CACHE_KEY = 'heatmapDataCache_v5';
+const CACHE_KEY = 'heatmapDataCache_v6';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const PAGE_SIZE = 250; // rows rendered per page
 
@@ -91,6 +91,40 @@ function _buildHeatmapItems(text) {
   ).filter(Boolean);
 }
 
+// Parse the full radar sheet — stocks from A-I, summary from K-L
+function _parseRadarSheet(csvText) {
+  const rows = _parseCsvRows(csvText);
+  if (rows.length < 2) return { stocks: [], summary: {} };
+  const headers = rows[0];
+
+  const sm = {};
+  if (headers[10]) sm[headers[10]] = (headers[11] || '').trim();
+  for (let i = 1; i <= 5 && i < rows.length; i++) {
+    const k = (rows[i]?.[10] || '').trim();
+    const v = (rows[i]?.[11] || '').trim();
+    if (k) sm[k] = v;
+  }
+
+  const stocks = rows.slice(1).map((row) => {
+    const obj = {};
+    for (let i = 0; i <= 8 && i < headers.length; i++) {
+      obj[headers[i] || `col_${i}`] = (row[i] || '').trim();
+    }
+    return _normalizeRadarRow(obj);
+  }).filter((r) => r.symbol);
+
+  return {
+    stocks,
+    summary: {
+      totalStocks: parseInt(sm['Total Stocks']) || stocks.length,
+      pctChange:   parseFloat(String(sm['%Change']).replace('%', '')) || 0,
+      advance:     parseInt(sm['Advance']) || 0,
+      decliners:   parseInt(sm['Decliners']) || 0,
+      sentiment:   sm['Market Sentiment'] || 'Neutral',
+    },
+  };
+}
+
 // Fetch directly from Google Sheets (fallback for local dev)
 async function _fetchFromSheets() {
   const [stocksRes, heatmapRes, radarRes] = await Promise.all([
@@ -102,10 +136,12 @@ async function _fetchFromSheets() {
   const [stocksCsv, heatmapCsv, radarCsv] = await Promise.all([
     stocksRes.text(), heatmapRes.text(), radarRes.text(),
   ]);
+  const radarSheet = _parseRadarSheet(radarCsv);
   return {
-    stocks:  _parseCsvToObjects(stocksCsv).map(_normalizeStockRow),
-    heatmap: _buildHeatmapItems(heatmapCsv),
-    radar:   _parseCsvToObjects(radarCsv).map(_normalizeRadarRow),
+    stocks:       _parseCsvToObjects(stocksCsv).map(_normalizeStockRow),
+    heatmap:      _buildHeatmapItems(heatmapCsv),
+    radar:        radarSheet.stocks,
+    radarSummary: radarSheet.summary,
   };
 }
 
@@ -149,6 +185,7 @@ const state = {
   stocks:         [],
   heatmap:        [],
   radar:          [],
+  radarSummary:   {},  // pre-computed from sheet (Total Stocks, %Change, Advance, Decliners, Sentiment)
   activeView:     'stocks',
   sortBy:         'dailyChange',
   sortDir:        'desc',
@@ -387,6 +424,42 @@ function updateSummary(stocks) {
       <span class="change-badge loss">${formatChange(item.dailyChange)}</span>
     </li>`;
   }).join('');
+}
+
+/* ============================================================
+   RENDERING — summary cards (radar — reads pre-computed sheet values)
+   ============================================================ */
+function updateRadarSummary(s) {
+  el.totalCount.textContent = s.totalStocks || '—';
+  el.avgChange.textContent  = `${(s.pctChange || 0).toFixed(2)}%`;
+
+  // Sentiment chip — read directly from sheet
+  const sentMap = { Bullish: 'bullish', Bearish: 'bearish', Neutral: 'neutral' };
+  const key = sentMap[s.sentiment] || 'neutral';
+  const emoji = { bullish: '🟢', bearish: '🔴', neutral: '🟡' };
+  el.marketSentiment.textContent       = `${emoji[key]} ${s.sentiment}`;
+  el.marketSentiment.dataset.sentiment = key;
+
+  // Adv / Decliners — from sheet
+  const unch = (s.totalStocks || 0) - (s.advance || 0) - (s.decliners || 0);
+  el.advDecliners.innerHTML =
+    `<span class="adv-count">${s.advance}\u00a0▲</span>` +
+    `<span class="adv-sep"> / </span>` +
+    `<span class="dec-count">${s.decliners}\u00a0▼</span>` +
+    (unch > 0 ? `<span class="unch-count"> (${unch}\u00a0—)</span>` : '');
+
+  // Sentiment bar
+  const pctGain = s.totalStocks ? Math.round((s.advance / s.totalStocks) * 100) : 50;
+  renderSentimentBar(pctGain);
+
+  // Top movers — still computed from radar stock data (cheap sort)
+  const sorted = [...state.radar].sort((a, b) => b.pctChange - a.pctChange);
+  el.topGainers.innerHTML = sorted.slice(0, 5).map((r) =>
+    `<li class="mover-item"><span class="mover-symbol">${r.symbol}</span><span class="change-badge gain">${formatChange(r.pctChange)}</span></li>`
+  ).join('');
+  el.topLosers.innerHTML = sorted.slice(-5).reverse().map((r) =>
+    `<li class="mover-item"><span class="mover-symbol">${r.symbol}</span><span class="change-badge loss">${formatChange(r.pctChange)}</span></li>`
+  ).join('');
 }
 
 /* ============================================================
@@ -658,7 +731,7 @@ function renderCurrentView() {
     state._dirty.heatmap = false;
   } else if (isRadar && state._dirty.radar) {
     renderRadarTable(state.radar);
-    updateSummary(state.radar.map((r) => ({ ...r, securityId: r.symbol, dailyChange: r.pctChange })));
+    updateRadarSummary(state.radarSummary);
     state._dirty.radar = false;
   }
 }
@@ -706,10 +779,11 @@ async function loadData(forceRefresh = false) {
   if (!forceRefresh) {
     const hit = loadCache();
     if (hit) {
-      state.stocks      = hit.data.stocks;
-      state.heatmap     = hit.data.heatmap;
-      state.radar       = hit.data.radar || [];
-      state.lastFetched = new Date(hit.timestamp);
+      state.stocks       = hit.data.stocks;
+      state.heatmap      = hit.data.heatmap;
+      state.radar        = hit.data.radar || [];
+      state.radarSummary = hit.data.radarSummary || {};
+      state.lastFetched  = new Date(hit.timestamp);
       updateTimestamp();
       renderCurrentView();
       el.refreshButton.classList.remove('loading');
@@ -734,11 +808,12 @@ async function loadData(forceRefresh = false) {
       throw new Error(`API error: HTTP ${apiRes.status}`);
     }
 
-    state.stocks      = data.stocks  || [];
-    state.heatmap     = data.heatmap || [];
-    state.radar       = data.radar   || [];
-    state.lastFetched = new Date();
-    saveCache({ stocks: state.stocks, heatmap: state.heatmap, radar: state.radar });
+    state.stocks       = data.stocks       || [];
+    state.heatmap      = data.heatmap      || [];
+    state.radar        = data.radar        || [];
+    state.radarSummary = data.radarSummary || {};
+    state.lastFetched  = new Date();
+    saveCache({ stocks: state.stocks, heatmap: state.heatmap, radar: state.radar, radarSummary: state.radarSummary });
     markAllDirty();
     updateTimestamp();
     renderCurrentView();

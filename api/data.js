@@ -30,6 +30,10 @@ const RADAR_CSV_URL =
   process.env.RADAR_CSV_URL ||
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjR79H2FbUkdxllGsK37_U8Q-zAkyYTZcV2yS5IC-gPuOvha1Q-agxqPppXitU6nz-yjODMlYaRDJC/pub?gid=704501126&single=true&output=csv';
 
+const RESULTS_CSV_URL =
+  process.env.RESULTS_CSV_URL ||
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjR79H2FbUkdxllGsK37_U8Q-zAkyYTZcV2yS5IC-gPuOvha1Q-agxqPppXitU6nz-yjODMlYaRDJC/pub?gid=1150501903&single=true&output=csv';
+
 // ─── CSV Parsing ───────────────────────────────────────────────────────────────
 function parseCsvLine(line) {
   const values = [];
@@ -151,6 +155,35 @@ function buildHeatmapItems(text) {
   ).filter(Boolean);
 }
 
+// Parse Results sheet — cols A-E for results, today's date from K column
+function parseResultsSheet(csvText) {
+  const rows = parseCsvRows(csvText);
+  if (rows.length < 2) return { items: [], today: '' };
+  const headers = rows[0];
+
+  // Find "Today's Date" column and get the value from the next column in header
+  let todayStr = '';
+  const tdIdx = headers.findIndex(h => /today/i.test(h));
+  if (tdIdx >= 0) {
+    // Value is in the next header column (same row) or first data row same column
+    todayStr = (headers[tdIdx + 1] || '').trim();
+    if (!todayStr && rows[1]) todayStr = (rows[1][tdIdx] || '').trim();
+  }
+
+  // Build results from cols 0-4 (SYMBOL, COMPANY, PURPOSE, DETAILS, DATE)
+  const items = rows.slice(1)
+    .filter(row => (row[0] || '').trim() && (row[4] || '').trim())
+    .map(row => ({
+      symbol:  (row[0] || '').trim(),
+      company: (row[1] || '').trim(),
+      purpose: (row[2] || '').trim(),
+      details: (row[3] || '').trim(),
+      date:    (row[4] || '').trim(),
+    }));
+
+  return { items, today: todayStr };
+}
+
 // ─── Handler ───────────────────────────────────────────────────────────────────
 export default async function handler(req, res) {
   // Only allow GET
@@ -160,25 +193,29 @@ export default async function handler(req, res) {
 
   try {
     // Fetch both sheets in parallel
-    const [stocksRes, heatmapRes, radarRes] = await Promise.all([
+    const [stocksRes, heatmapRes, radarRes, resultsRes] = await Promise.all([
       fetch(STOCKS_CSV_URL),
       fetch(HEATMAP_CSV_URL),
       fetch(RADAR_CSV_URL),
+      fetch(RESULTS_CSV_URL),
     ]);
 
     if (!stocksRes.ok)  throw new Error(`Stocks sheet fetch failed: HTTP ${stocksRes.status}`);
     if (!heatmapRes.ok) throw new Error(`Heatmap sheet fetch failed: HTTP ${heatmapRes.status}`);
     if (!radarRes.ok)   throw new Error(`Radar sheet fetch failed: HTTP ${radarRes.status}`);
+    if (!resultsRes.ok) throw new Error(`Results sheet fetch failed: HTTP ${resultsRes.status}`);
 
-    const [stocksCsv, heatmapCsv, radarCsv] = await Promise.all([
+    const [stocksCsv, heatmapCsv, radarCsv, resultsCsv] = await Promise.all([
       stocksRes.text(),
       heatmapRes.text(),
       radarRes.text(),
+      resultsRes.text(),
     ]);
 
     const stocks  = parseCsvToObjects(stocksCsv).map(normalizeStockRow);
     const heatmap = buildHeatmapItems(heatmapCsv);
     const radarSheet = parseRadarSheet(radarCsv);
+    const resultsSheet = parseResultsSheet(resultsCsv);
 
     // Edge cache for 5 min, serve stale for 10 min while revalidating.
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
@@ -189,8 +226,10 @@ export default async function handler(req, res) {
       heatmap,
       radar:        radarSheet.stocks,
       radarSummary: radarSheet.summary,
+      results:      resultsSheet.items,
+      resultsToday: resultsSheet.today,
       cachedAt: Date.now(),
-      counts: { stocks: stocks.length, heatmap: heatmap.length, radar: radarSheet.stocks.length },
+      counts: { stocks: stocks.length, heatmap: heatmap.length, radar: radarSheet.stocks.length, results: resultsSheet.items.length },
     });
   } catch (err) {
     console.error('[api/data] Error:', err.message);

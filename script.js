@@ -1,7 +1,7 @@
 /* ============================================================
    CONFIG
    ============================================================ */
-const CACHE_KEY = 'heatmapDataCache_v6';
+const CACHE_KEY = 'heatmapDataCache_v7';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const PAGE_SIZE = 250; // rows rendered per page
 
@@ -11,6 +11,7 @@ const PAGE_SIZE = 250; // rows rendered per page
 const _STOCKS_CSV  = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT3osxouCCViNZUmiibpkD3BrPn0DzkRylyU-Yad6E6-T5NI3bYfL1DL0wD5-NmgVpvE7j2afXv8Dx4/pub?gid=0&single=true&output=csv';
 const _HEATMAP_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vT3osxouCCViNZUmiibpkD3BrPn0DzkRylyU-Yad6E6-T5NI3bYfL1DL0wD5-NmgVpvE7j2afXv8Dx4/pub?gid=1442357326&single=true&output=csv';
 const _RADAR_CSV   = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjR79H2FbUkdxllGsK37_U8Q-zAkyYTZcV2yS5IC-gPuOvha1Q-agxqPppXitU6nz-yjODMlYaRDJC/pub?gid=704501126&single=true&output=csv';
+const _RESULTS_CSV = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjR79H2FbUkdxllGsK37_U8Q-zAkyYTZcV2yS5IC-gPuOvha1Q-agxqPppXitU6nz-yjODMlYaRDJC/pub?gid=1150501903&single=true&output=csv';
 
 /* ============================================================
    CSV PARSING (fallback path only — used when /api/data unavailable)
@@ -125,23 +126,53 @@ function _parseRadarSheet(csvText) {
   };
 }
 
+// Parse Results sheet — cols A-E for results, today's date from K column
+function _parseResultsSheet(csvText) {
+  const rows = _parseCsvRows(csvText);
+  if (rows.length < 2) return { items: [], today: '' };
+  const headers = rows[0];
+
+  let todayStr = '';
+  const tdIdx = headers.findIndex(h => /today/i.test(h));
+  if (tdIdx >= 0) {
+    todayStr = (headers[tdIdx + 1] || '').trim();
+    if (!todayStr && rows[1]) todayStr = (rows[1][tdIdx] || '').trim();
+  }
+
+  const items = rows.slice(1)
+    .filter(row => (row[0] || '').trim() && (row[4] || '').trim())
+    .map(row => ({
+      symbol:  (row[0] || '').trim(),
+      company: (row[1] || '').trim(),
+      purpose: (row[2] || '').trim(),
+      details: (row[3] || '').trim(),
+      date:    (row[4] || '').trim(),
+    }));
+
+  return { items, today: todayStr };
+}
+
 // Fetch directly from Google Sheets (fallback for local dev)
 async function _fetchFromSheets() {
-  const [stocksRes, heatmapRes, radarRes] = await Promise.all([
+  const [stocksRes, heatmapRes, radarRes, resultsRes] = await Promise.all([
     fetch(_STOCKS_CSV),
     fetch(_HEATMAP_CSV),
     fetch(_RADAR_CSV),
+    fetch(_RESULTS_CSV),
   ]);
-  if (!stocksRes.ok || !heatmapRes.ok || !radarRes.ok) throw new Error('Sheet fetch failed');
-  const [stocksCsv, heatmapCsv, radarCsv] = await Promise.all([
-    stocksRes.text(), heatmapRes.text(), radarRes.text(),
+  if (!stocksRes.ok || !heatmapRes.ok || !radarRes.ok || !resultsRes.ok) throw new Error('Sheet fetch failed');
+  const [stocksCsv, heatmapCsv, radarCsv, resultsCsv] = await Promise.all([
+    stocksRes.text(), heatmapRes.text(), radarRes.text(), resultsRes.text(),
   ]);
   const radarSheet = _parseRadarSheet(radarCsv);
+  const resultsSheet = _parseResultsSheet(resultsCsv);
   return {
     stocks:       _parseCsvToObjects(stocksCsv).map(_normalizeStockRow),
     heatmap:      _buildHeatmapItems(heatmapCsv),
     radar:        radarSheet.stocks,
     radarSummary: radarSheet.summary,
+    results:      resultsSheet.items,
+    resultsToday: resultsSheet.today,
   };
 }
 
@@ -152,8 +183,12 @@ const el = {
   stocksView:             document.getElementById('stocksView'),
   heatmapView:            document.getElementById('heatmapView'),
   radarView:              document.getElementById('radarView'),
+  resultsView:            document.getElementById('resultsView'),
   stocksBody:             document.getElementById('stocksBody'),
   radarBody:              document.getElementById('radarBody'),
+  resultsBody:            document.getElementById('resultsBody'),
+  resultsDateStrip:       document.getElementById('resultsDateStrip'),
+  resultsDateSection:     document.getElementById('resultsDateSection'),
   skeletonLoader:         document.getElementById('skeletonLoader'),
   errorBanner:            document.getElementById('errorBanner'),
   errorMessage:           document.getElementById('errorMessage'),
@@ -186,6 +221,8 @@ const state = {
   heatmap:        [],
   radar:          [],
   radarSummary:   {},  // pre-computed from sheet (Total Stocks, %Change, Advance, Decliners, Sentiment)
+  results:        [],  // results/corporate actions from sheet
+  resultsToday:   '',  // today's date from sheet
   activeView:     'stocks',
   sortBy:         'dailyChange',
   sortDir:        'desc',
@@ -195,11 +232,11 @@ const state = {
   radarSortBy:    'pctChange',
   radarSortDir:   'desc',
   visibleCount:   PAGE_SIZE,
-  _dirty:         { stocks: true, heatmap: true, radar: true }, // tracks which views need re-render
+  _dirty:         { stocks: true, heatmap: true, radar: true, results: true }, // tracks which views need re-render
 };
 
 function markAllDirty() {
-  state._dirty.stocks = state._dirty.heatmap = state._dirty.radar = true;
+  state._dirty.stocks = state._dirty.heatmap = state._dirty.radar = state._dirty.results = true;
 }
 
 /* ============================================================
@@ -693,6 +730,7 @@ function setLoading(isLoading) {
   el.stocksView.classList.add('hidden');
   el.heatmapView.classList.add('hidden');
   el.radarView.classList.add('hidden');
+  el.resultsView.classList.add('hidden');
   el.errorBanner.classList.add('hidden');
   if (isLoading) buildSkeletonRows(12);
 }
@@ -702,8 +740,145 @@ function setError(message) {
   el.stocksView.classList.add('hidden');
   el.heatmapView.classList.add('hidden');
   el.radarView.classList.add('hidden');
+  el.resultsView.classList.add('hidden');
   el.errorMessage.textContent = message;
   el.errorBanner.classList.remove('hidden');
+}
+
+/* ============================================================
+   RESULTS VIEW — date-grouped corporate actions
+   ============================================================ */
+function _parseDateDMY(str) {
+  // "07-May-2026" → Date object
+  const parts = str.match(/(\d{1,2})-(\w{3})-(\d{4})/);
+  if (!parts) return null;
+  return new Date(`${parts[2]} ${parts[1]}, ${parts[3]}`);
+}
+
+function _formatDateLabel(d) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const days   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+function _formatDateKey(d) {
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return `${String(d.getDate()).padStart(2,'0')}-${months[d.getMonth()]}-${d.getFullYear()}`;
+}
+
+function renderResultsView() {
+  const results = state.results;
+  if (!results.length) {
+    el.resultsDateStrip.innerHTML = '<p style="text-align:center;opacity:.5">No results data available</p>';
+    el.resultsDateSection.innerHTML = '';
+    el.resultsBody.innerHTML = '';
+    return;
+  }
+
+  // Build stock lookup for cross-referencing sector/industry/%change
+  const stockMap = {};
+  state.stocks.forEach(s => { stockMap[s.symbol] = s; });
+
+  // Parse today's date from sheet
+  const today = _parseDateDMY(state.resultsToday) || new Date();
+  today.setHours(0,0,0,0);
+
+  // Build date range: past 5 days + today + next 5 days
+  const datePills = [];
+  for (let i = -5; i <= 5; i++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() + i);
+    datePills.push({ date: d, label: _formatDateLabel(d), key: _formatDateKey(d), isToday: i === 0 });
+  }
+
+  // Group results by date key
+  const groupedByDate = {};
+  results.forEach(r => {
+    const rd = _parseDateDMY(r.date);
+    if (!rd) return;
+    const key = _formatDateKey(rd);
+    if (!groupedByDate[key]) groupedByDate[key] = [];
+    groupedByDate[key].push(r);
+  });
+
+  // Render date pills strip
+  el.resultsDateStrip.innerHTML = datePills.map(p => {
+    const count = (groupedByDate[p.key] || []).length;
+    return `<button class="results-date-pill${p.isToday ? ' active today' : ''}" data-datekey="${p.key}">
+      <span class="pill-label">${p.label}</span>
+      <span class="pill-count">${count}</span>
+    </button>`;
+  }).join('');
+
+  // Click handler for pills
+  el.resultsDateStrip.querySelectorAll('.results-date-pill').forEach(btn => {
+    btn.addEventListener('click', () => {
+      el.resultsDateStrip.querySelectorAll('.results-date-pill').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      _renderDateSection(btn.dataset.datekey, groupedByDate, stockMap);
+    });
+  });
+
+  // Show today's section initially
+  const todayKey = _formatDateKey(today);
+  _renderDateSection(todayKey, groupedByDate, stockMap);
+
+  // Full table (all results, sorted by date ascending)
+  const sorted = [...results].sort((a, b) => {
+    const da = _parseDateDMY(a.date), db = _parseDateDMY(b.date);
+    return (da || 0) - (db || 0);
+  });
+
+  const rows = sorted.map(r => {
+    const s = stockMap[r.symbol] || {};
+    const pct = s.dailyChange;
+    const color = pct > 0 ? 'var(--clr-gain)' : pct < 0 ? 'var(--clr-loss)' : 'var(--clr-neutral)';
+    const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '';
+    return `<tr>
+      <td>${r.date}</td>
+      <td class="stock-name">${r.symbol}</td>
+      <td>${r.company}</td>
+      <td>${s.sectorName || '—'}</td>
+      <td>${s.industryNewName || s.iGroupName || '—'}</td>
+      <td><span class="purpose-badge">${r.purpose}</span></td>
+      <td style="color:${color}">${pct != null ? `${arrow} ${Math.abs(pct).toFixed(2)}%` : '—'}</td>
+    </tr>`;
+  }).join('');
+  el.resultsBody.innerHTML = rows;
+}
+
+function _renderDateSection(dateKey, groupedByDate, stockMap) {
+  const items = groupedByDate[dateKey] || [];
+  if (!items.length) {
+    el.resultsDateSection.innerHTML = `<div class="results-empty">No results scheduled for this date</div>`;
+    return;
+  }
+
+  const cards = items.map(r => {
+    const s = stockMap[r.symbol] || {};
+    const pct = s.dailyChange;
+    const color = pct > 0 ? 'gain' : pct < 0 ? 'loss' : 'neutral';
+    const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '';
+    return `<div class="result-card">
+      <div class="result-card-header">
+        <span class="result-symbol">${r.symbol}</span>
+        <span class="result-pct ${color}">${pct != null ? `${arrow} ${Math.abs(pct).toFixed(2)}%` : '—'}</span>
+      </div>
+      <div class="result-company">${r.company}</div>
+      <div class="result-meta">
+        ${s.sectorName ? `<span class="result-tag">${s.sectorName}</span>` : ''}
+        ${s.industryNewName ? `<span class="result-tag">${s.industryNewName}</span>` : ''}
+        ${s.iGroupName ? `<span class="result-tag">${s.iGroupName}</span>` : ''}
+        ${s.iSubGroupName ? `<span class="result-tag">${s.iSubGroupName}</span>` : ''}
+      </div>
+      <div class="result-purpose">${r.purpose}</div>
+    </div>`;
+  }).join('');
+
+  el.resultsDateSection.innerHTML = `
+    <div class="results-date-header">${items.length} result${items.length > 1 ? 's' : ''} on ${dateKey}</div>
+    <div class="results-cards-grid">${cards}</div>
+  `;
 }
 
 function renderCurrentView() {
@@ -713,10 +888,12 @@ function renderCurrentView() {
   const isStocks  = state.activeView === 'stocks';
   const isHeatmap = state.activeView === 'heatmap';
   const isRadar   = state.activeView === 'radar';
+  const isResults = state.activeView === 'results';
 
   el.stocksView.classList.toggle('hidden', !isStocks);
   el.heatmapView.classList.toggle('hidden', !isHeatmap);
   el.radarView.classList.toggle('hidden', !isRadar);
+  el.resultsView.classList.toggle('hidden', !isResults);
 
   // Table re-render is expensive — only when data/filters changed.
   // Summary cards are cheap — always update on tab switch so numbers stay correct.
@@ -739,6 +916,11 @@ function renderCurrentView() {
       state._dirty.radar = false;
     }
     updateRadarSummary(state.radarSummary);
+  } else if (isResults) {
+    if (state._dirty.results) {
+      renderResultsView();
+      state._dirty.results = false;
+    }
   }
 }
 
@@ -757,6 +939,10 @@ function preRenderHidden() {
     if (state._dirty.radar && state.activeView !== 'radar') {
       renderRadarTable(state.radar);
       state._dirty.radar = false;
+    }
+    if (state._dirty.results && state.activeView !== 'results') {
+      renderResultsView();
+      state._dirty.results = false;
     }
   });
 }
@@ -808,6 +994,8 @@ async function loadData(forceRefresh = false) {
       state.heatmap      = hit.data.heatmap;
       state.radar        = hit.data.radar || [];
       state.radarSummary = hit.data.radarSummary || {};
+      state.results      = hit.data.results || [];
+      state.resultsToday = hit.data.resultsToday || '';
       state.lastFetched  = new Date(hit.timestamp);
       state._filteredStocks = filterAndSortStocks(state.stocks);
       updateTimestamp();
@@ -839,9 +1027,11 @@ async function loadData(forceRefresh = false) {
     state.heatmap      = data.heatmap      || [];
     state.radar        = data.radar        || [];
     state.radarSummary = data.radarSummary || {};
+    state.results      = data.results      || [];
+    state.resultsToday = data.resultsToday || '';
     state.lastFetched  = new Date();
     state._filteredStocks = filterAndSortStocks(state.stocks);
-    saveCache({ stocks: state.stocks, heatmap: state.heatmap, radar: state.radar, radarSummary: state.radarSummary });
+    saveCache({ stocks: state.stocks, heatmap: state.heatmap, radar: state.radar, radarSummary: state.radarSummary, results: state.results, resultsToday: state.resultsToday });
     markAllDirty();
     updateTimestamp();
     renderCurrentView();

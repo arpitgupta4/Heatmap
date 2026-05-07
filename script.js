@@ -61,7 +61,7 @@ function _normalizeStockRow(row) {
       row['%Change'] || row['Daily Chang'] || row['Daily Change'] ||
       row['% Change'] || row['Daily %change'] || ''
     ),
-    change: _parseNumber(row['Change'] || 0),
+    change: _parseNumber(row['Daily Change'] || row['Change'] || 0),
     ltp: _parseNumber(row['LTP'] || row['Close'] || row['Last Price'] || 0)
   };
 }
@@ -792,7 +792,7 @@ function renderResultsView() {
 
   // Build stock lookup for cross-referencing sector/industry/%change
   const stockMap = {};
-  state.stocks.forEach(s => { stockMap[s.symbol] = s; });
+  state.stocks.forEach(s => { stockMap[s.securityId] = s; });
 
   // Parse today's date from sheet
   const today = _parseDateDMY(state.resultsToday) || new Date();
@@ -898,10 +898,10 @@ function _renderDateSection(dateKey, groupedByDate, stockMap) {
         Change: <span style="color: var(--${color})">${changeText}</span> &nbsp;|&nbsp; %Change: <span style="color: var(--${color})">${pctText}</span>
       </div>
       <div class="result-meta">
-        ${s.sectorName ? `<span class="result-tag">${s.sectorName}</span>` : ''}
-        ${s.industryNewName ? `<span class="result-tag">${s.industryNewName}</span>` : ''}
-        ${s.iGroupName ? `<span class="result-tag">${s.iGroupName}</span>` : ''}
-        ${s.iSubGroupName ? `<span class="result-tag">${s.iSubGroupName}</span>` : ''}
+        ${s.name ? `<span class="result-tag">${s.name}</span>` : ''}
+        ${s.industry ? `<span class="result-tag">${s.industry}</span>` : ''}
+        ${s.group ? `<span class="result-tag">${s.group}</span>` : ''}
+        ${s.subgroup ? `<span class="result-tag">${s.subgroup}</span>` : ''}
       </div>
       <div class="result-purpose">${r.purpose}</div>
     </div>`;

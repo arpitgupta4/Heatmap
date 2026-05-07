@@ -794,6 +794,18 @@ function renderResultsView() {
   const stockMap = {};
   state.stocks.forEach(s => { stockMap[s.securityId] = s; });
 
+  // Filter out results that are missing Sector, Industry, Group, Subgroup, or % Change
+  results = results.filter(r => {
+    const s = stockMap[r.symbol];
+    if (!s) return false;
+    if (!s.name || !s.industry || !s.group || !s.subgroup || s.dailyChange === null || s.dailyChange === undefined || s.dailyChange === 0 && !s.dailyChange) {
+      return false;
+    }
+    // Also ensuring they are not just '-' or empty strings
+    if (s.name === '—' || s.industry === '—') return false;
+    return true;
+  });
+
   // Parse today's date from sheet
   const today = _parseDateDMY(state.resultsToday) || new Date();
   today.setHours(0,0,0,0);

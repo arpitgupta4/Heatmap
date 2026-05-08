@@ -729,7 +729,7 @@ td.copyable:hover::after {
   background: rgba(30, 41, 59, 0.98);
 }
 
-/* Highlight rows where LTP > Prev Close */
+/* Highlight rows where LTP > High */
 .stocks-table tbody tr.row-highlight-gain td {
   background: rgba(34, 197, 94, 0.06);
 }

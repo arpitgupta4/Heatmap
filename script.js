@@ -690,8 +690,8 @@ function renderRadarTable(items) {
   const page = filtered.slice(0, state.visibleCount);
   const frag = document.createDocumentFragment();
   for (const r of page) {
-    const isGain = r.ltp > r.prevClose;
-    const ltpClass = isGain ? 'gain' : r.ltp < r.prevClose ? 'loss' : '';
+    const isGain = r.ltp > r.high;
+    const ltpClass = r.ltp > r.prevClose ? 'gain' : r.ltp < r.prevClose ? 'loss' : '';
     const rowClass = isGain ? 'row-highlight-gain' : '';
     const tr = document.createElement('tr');
     if (rowClass) tr.className = rowClass;

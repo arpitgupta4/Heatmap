@@ -84,8 +84,12 @@ function normalizeRadarRow(row) {
 // Parse the full radar sheet — stocks from A-I, summary from K-L
 function parseRadarSheet(csvText) {
   const rows = parseCsvRows(csvText);
-  if (rows.length < 2) return { stocks: [], summary: {} };
+  if (rows.length < 2) return { stocks: [], summary: {}, error: false };
   const headers = rows[0];
+
+  if (headers[0] === '#VALUE!' || headers[0] === '#N/A' || headers[0] === '#ERROR!') {
+    return { stocks: [], summary: {}, error: true };
+  }
 
   // Extract summary key-value pairs from columns K (10) and L (11)
   const sm = {};
@@ -114,6 +118,7 @@ function parseRadarSheet(csvText) {
       decliners:   parseInt(sm['Decliners']) || 0,
       sentiment:   sm['Market Sentiment'] || 'Neutral',
     },
+    error: false
   };
 }
 
@@ -194,12 +199,13 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch both sheets in parallel
+    // Fetch both sheets in parallel, completely bypassing Vercel's internal fetch cache
+    const fetchOpts = { cache: 'no-store' };
     const [stocksRes, heatmapRes, radarRes, resultsRes] = await Promise.all([
-      fetch(STOCKS_CSV_URL),
-      fetch(HEATMAP_CSV_URL),
-      fetch(RADAR_CSV_URL),
-      fetch(RESULTS_CSV_URL),
+      fetch(STOCKS_CSV_URL, fetchOpts),
+      fetch(HEATMAP_CSV_URL, fetchOpts),
+      fetch(RADAR_CSV_URL, fetchOpts),
+      fetch(RESULTS_CSV_URL, fetchOpts),
     ]);
 
     if (!stocksRes.ok)  throw new Error(`Stocks sheet fetch failed: HTTP ${stocksRes.status}`);
@@ -228,6 +234,7 @@ export default async function handler(req, res) {
       heatmap,
       radar:        radarSheet.stocks,
       radarSummary: radarSheet.summary,
+      radarError:   radarSheet.error,
       results:      resultsSheet.items,
       resultsToday: resultsSheet.today,
       cachedAt: Date.now(),

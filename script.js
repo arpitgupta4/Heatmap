@@ -1072,7 +1072,8 @@ async function loadData(forceRefresh = false) {
     let data; // { stocks, heatmap, radar }
 
     // ─ Try the secure API proxy first ──────────────────────────────
-    const apiRes = await fetch('/api/data').catch(() => ({ status: 0, ok: false }));
+    const apiUrl = forceRefresh ? `/api/data?t=${Date.now()}` : '/api/data';
+    const apiRes = await fetch(apiUrl).catch(() => ({ status: 0, ok: false }));
 
     if (apiRes.ok) {
       // ✅ Vercel / vercel dev — data from server, sheet URL never exposed

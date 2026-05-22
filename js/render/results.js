@@ -120,6 +120,7 @@ function renderResultsView() {
   let initialKey = todayKeyStr;
 
   if (state.resultsQuery) {
+    // Search mode — only dates that have matching results
     const uniqueDates = Array.from(new Set(results.map(r => r.date)));
     const sortedDates = uniqueDates.map(_parseDateDMY).filter(Boolean).sort((a, b) => a - b);
     datePills = sortedDates.map((d, index) => {
@@ -128,11 +129,34 @@ function renderResultsView() {
     });
     if (datePills.length > 0) initialKey = datePills[0].key;
   } else {
-    for (let i = -5; i <= 5; i++) {
-      const d = new Date(today);
-      d.setDate(d.getDate() + i);
+    // Default mode — ALL unique dates present in the sheet, sorted chronologically
+    const allDatesInSheet = Array.from(
+      new Set(state.results.map(r => r.date))
+    )
+      .map(d => _parseDateDMY(d))
+      .filter(Boolean)
+      .sort((a, b) => a - b);
+
+    datePills = allDatesInSheet.map(d => {
       const key = _formatDateKey(d);
-      datePills.push({ date: d, label: _formatDateLabel(d), key, isToday: key === todayKeyStr, isActive: key === todayKeyStr });
+      return {
+        date: d,
+        label: _formatDateLabel(d),
+        key,
+        isToday:  key === todayKeyStr,
+        isActive: key === todayKeyStr,
+      };
+    });
+
+    // Default to today if present; otherwise pick the closest upcoming date
+    const todayPill = datePills.find(p => p.isActive);
+    if (!todayPill && datePills.length > 0) {
+      const now = Date.now();
+      const closest = datePills.reduce((prev, cur) =>
+        Math.abs(cur.date - now) < Math.abs(prev.date - now) ? cur : prev
+      );
+      closest.isActive = true;
+      initialKey = closest.key;
     }
   }
 
@@ -154,6 +178,14 @@ function renderResultsView() {
     </button>`;
   }).join('');
 
+  // Auto-scroll the active pill into view (centered)
+  requestAnimationFrame(() => {
+    const activePill = el.resultsDateStrip.querySelector('.results-date-pill.active');
+    if (activePill) {
+      activePill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  });
+
   // Click handler for pills
   el.resultsDateStrip.querySelectorAll('.results-date-pill').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -165,3 +197,4 @@ function renderResultsView() {
 
   _renderDateSection(initialKey, groupedByDate, stockMap);
 }
+

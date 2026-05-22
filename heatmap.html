@@ -227,6 +227,19 @@
     <!-- ── TOAST ─────────────────────────────────────── -->
     <div id="toastNotification" class="toast" aria-live="polite" aria-atomic="true"></div>
 
-    <script src="script.js"></script>
+    <!-- ── JS MODULES (load order matters — each file depends on the ones above) -->
+    <script src="js/config.js"></script>     <!-- constants, CSV URLs -->
+    <script src="js/utils.js"></script>      <!-- formatChange, formatPrice, debounce, etc. -->
+    <script src="js/parse.js"></script>      <!-- CSV parsers + local-dev fallback fetch -->
+    <script src="js/state.js"></script>      <!-- `el` DOM refs + `state` object -->
+    <script src="js/cache.js"></script>      <!-- saveCache / loadCache -->
+    <script src="js/compute.js"></script>    <!-- summaryFromStocks, filterAndSortStocks -->
+    <script src="js/render/stocks.js"></script>   <!-- changeBadge, renderStocksTable, updateSummary -->
+    <script src="js/render/heatmap.js"></script>  <!-- renderHeatmapCards -->
+    <script src="js/render/radar.js"></script>    <!-- renderRadarTable, updateRadarSummary -->
+    <script src="js/render/results.js"></script>  <!-- renderResultsView -->
+    <script src="js/ui.js"></script>         <!-- setLoading, setError, setActiveView, copyToClipboard -->
+    <script src="js/data.js"></script>       <!-- loadData, renderCurrentView, preRenderHidden -->
+    <script src="js/events.js"></script>     <!-- bindEventListeners() + loadData() init -->
   </body>
 </html>

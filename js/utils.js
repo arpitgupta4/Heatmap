@@ -1,6 +1,20 @@
 /* ============================================================
    UTILS — pure helper functions (no DOM, no state)
    ============================================================ */
+
+/**
+ * Escape the five HTML special characters so user-supplied strings are
+ * safe to interpolate inside innerHTML template literals.
+ */
+function escHtml(s) {
+  return String(s == null ? '' : s)
+    .replace(/&/g,  '&amp;')
+    .replace(/</g,  '&lt;')
+    .replace(/>/g,  '&gt;')
+    .replace(/"/g,  '&quot;')
+    .replace(/'/g,  '&#39;');
+}
+
 function formatChange(value) {
   const sign = value > 0 ? '+' : '';
   return `${sign}${value.toFixed(2)}%`;

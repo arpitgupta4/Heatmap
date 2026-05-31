@@ -67,14 +67,21 @@ async function copyToClipboard(text) {
     await navigator.clipboard.writeText(text);
     showToast(`Copied: ${text}`);
   } catch (_) {
+    // Fallback for older browsers / non-HTTPS contexts
     const ta = document.createElement('textarea');
     ta.value = text;
-    ta.style.cssText = 'position:fixed;opacity:0;pointer-events:none';
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none';
     document.body.appendChild(ta);
+    ta.focus();
     ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    showToast(`Copied: ${text}`);
+    try {
+      // execCommand is deprecated but still widely supported as a last resort
+      const ok = document.execCommand('copy');
+      if (ok) showToast(`Copied: ${text}`);
+    } finally {
+      document.body.removeChild(ta);
+    }
   }
 }
 

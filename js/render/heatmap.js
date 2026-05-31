@@ -42,7 +42,7 @@ function renderHeatmapCards(items) {
 
     const header = document.createElement('div');
     header.className = 'heatmap-section-header';
-    header.innerHTML = `<h2>${type}</h2><span class="count-badge">${groupItems.length}</span>`;
+    header.innerHTML = `<h2>${escHtml(type)}</h2><span class="count-badge">${groupItems.length}</span>`;
     section.appendChild(header);
 
     const grid = document.createElement('div');
@@ -52,15 +52,15 @@ function renderHeatmapCards(items) {
     const maxAbs = Math.max(...sorted.map((i) => Math.abs(i.dailyChange)), 0.01);
 
     for (const item of sorted) {
-      const cardClass    = item.dailyChange > 0 ? 'gain-card' : item.dailyChange < 0 ? 'loss-card' : '';
-      const mag          = Math.abs(item.dailyChange) / maxAbs;
+      const cardClass     = item.dailyChange > 0 ? 'gain-card' : item.dailyChange < 0 ? 'loss-card' : '';
+      const mag           = Math.abs(item.dailyChange) / maxAbs;
       const valueFontSize = (1 + mag * 0.6).toFixed(2);
-      const count        = stockCountMap[item.name];
-      const displayName  = count ? `${item.name} (${count})` : item.name;
+      const count         = stockCountMap[item.name];
+      const displayName   = count ? `${escHtml(item.name)} (${count})` : escHtml(item.name);
 
       const card = document.createElement('div');
-      card.className   = `heatmap-card copyable ${cardClass}`;
-      card.dataset.copy = item.name;
+      card.className    = `heatmap-card copyable ${cardClass}`;
+      card.dataset.copy = item.name;           // raw value for clipboard
       card.title        = `Click to copy "${item.name}"`;
       card.innerHTML    = `
         <span class="heatmap-card-name">${displayName}</span>

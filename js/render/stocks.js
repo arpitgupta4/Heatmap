@@ -39,7 +39,7 @@ function updateSummary(stocks) {
   renderSentimentBar(s.pctGain);
 
   el.topGainers.innerHTML = s.topGainers.map((item) => {
-    const sym = item.securityId || item.symbol || item.name;
+    const sym = escHtml(item.securityId || item.symbol || item.name);
     return `<li class="mover-item">
       <span class="mover-symbol">${sym}</span>
       <span class="change-badge gain">${formatChange(item.dailyChange)}</span>
@@ -47,7 +47,7 @@ function updateSummary(stocks) {
   }).join('');
 
   el.topLosers.innerHTML = s.topLosers.map((item) => {
-    const sym = item.securityId || item.symbol || item.name;
+    const sym = escHtml(item.securityId || item.symbol || item.name);
     return `<li class="mover-item">
       <span class="mover-symbol">${sym}</span>
       <span class="change-badge loss">${formatChange(item.dailyChange)}</span>
@@ -75,12 +75,13 @@ function renderStocksTable(stocks) {
   const frag = document.createDocumentFragment();
   for (const s of page) {
     const tr = document.createElement('tr');
+    // escHtml on all data fields to prevent XSS from malicious CSV content
     tr.innerHTML = `
-      <td class="col-symbol copyable" data-copy="${s.securityId}">${s.securityId}</td>
-      <td class="copyable" data-copy="${s.name}">${s.name}</td>
-      <td class="copyable" data-copy="${s.industry}">${s.industry}</td>
-      <td class="copyable" data-copy="${s.group}">${s.group}</td>
-      <td class="copyable" data-copy="${s.subgroup}">${s.subgroup}</td>
+      <td class="col-symbol copyable" data-copy="${escHtml(s.securityId)}">${escHtml(s.securityId)}</td>
+      <td class="copyable" data-copy="${escHtml(s.name)}">${escHtml(s.name)}</td>
+      <td class="copyable" data-copy="${escHtml(s.industry)}">${escHtml(s.industry)}</td>
+      <td class="copyable" data-copy="${escHtml(s.group)}">${escHtml(s.group)}</td>
+      <td class="copyable" data-copy="${escHtml(s.subgroup)}">${escHtml(s.subgroup)}</td>
       <td class="col-change">${changeBadge(s.dailyChange)}</td>
     `;
     frag.appendChild(tr);

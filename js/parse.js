@@ -80,40 +80,64 @@ function _buildHeatmapItems(text) {
   ).filter(Boolean);
 }
 
+/**
+ * Compute radar summary purely from the stock array.
+ * Mirrors computeRadarSummary() in api/lib/sheets.js — no Google Sheets
+ * formula columns involved.
+ */
+function _computeRadarSummary(stocks) {
+  const total     = stocks.length;
+  const advance   = stocks.filter((s) => s.pctChange > 0).length;
+  const decliners = stocks.filter((s) => s.pctChange < 0).length;
+  const avgChange = total
+    ? stocks.reduce((sum, s) => sum + s.pctChange, 0) / total
+    : 0;
+
+  const pctAdvancing = total ? Math.round((advance / total) * 100) : 50;
+  let sentiment;
+  if      (pctAdvancing >= 60) sentiment = 'Bullish';
+  else if (pctAdvancing <= 40) sentiment = 'Bearish';
+  else                         sentiment = 'Neutral';
+
+  return { totalStocks: total, pctChange: avgChange, advance, decliners, sentiment };
+}
+
+/**
+ * Parse the radar CSV.
+ * New logic: reads only stock-data columns, ignores cols K/L formula values,
+ * and computes all summary metrics locally — matching the server-side rewrite
+ * in api/lib/sheets.js so local-dev and production behave identically.
+ */
 function _parseRadarSheet(csvText) {
   const rows = _parseCsvRows(csvText);
-  if (rows.length < 2) return { stocks: [], summary: {}, error: false };
-  const headers = rows[0];
+  if (rows.length < 2) return { stocks: [], summary: _computeRadarSummary([]), error: false };
 
-  if (headers[0] === '#VALUE!' || headers[0] === '#N/A' || headers[0] === '#ERROR!') {
-    return { stocks: [], summary: {}, error: true };
+  const headers = rows[0];
+  const FORMULA_ERRORS = new Set(['#VALUE!', '#N/A', '#ERROR!', '#REF!', '#NAME?', '#NUM!', '#NULL!']);
+
+  if (FORMULA_ERRORS.has((headers[0] || '').trim())) {
+    return { stocks: [], summary: _computeRadarSummary([]), error: true };
   }
 
-  const sm = {};
-  if (headers[10]) sm[headers[10]] = (headers[11] || '').trim();
-  for (let i = 1; i <= 5 && i < rows.length; i++) {
-    const k = (rows[i]?.[10] || '').trim();
-    const v = (rows[i]?.[11] || '').trim();
-    if (k) sm[k] = v;
+  // Stop at the first formula-error column to avoid reading corrupt cells
+  let lastCol = headers.length;
+  for (let i = 0; i < headers.length; i++) {
+    if (FORMULA_ERRORS.has((headers[i] || '').trim())) { lastCol = i; break; }
   }
 
   const stocks = rows.slice(1).map((row) => {
     const obj = {};
-    for (let i = 0; i <= 8 && i < headers.length; i++) {
-      obj[headers[i] || `col_${i}`] = (row[i] || '').trim();
+    for (let i = 0; i < lastCol; i++) {
+      const key = (headers[i] || '').trim() || `col_${i}`;
+      obj[key] = (row[i] || '').trim();
     }
     return _normalizeRadarRow(obj);
   }).filter((r) => r.symbol);
 
   return {
     stocks,
-    summary: {
-      totalStocks: parseInt(sm['Total Stocks']) || stocks.length,
-      pctChange:   parseFloat(String(sm['%Change']).replace('%', '')) || 0,
-      advance:     parseInt(sm['Advance'])   || 0,
-      decliners:   parseInt(sm['Decliners']) || 0,
-      sentiment:   sm['Market Sentiment'] || 'Neutral',
-    },
+    summary: _computeRadarSummary(stocks),
+    error: false,
   };
 }
 
@@ -123,15 +147,15 @@ function _parseResultsSheet(csvText) {
   const headers = rows[0];
 
   let todayStr = '';
-  const tdIdx = headers.findIndex(h => /today/i.test(h));
+  const tdIdx = headers.findIndex((h) => /today/i.test(h));
   if (tdIdx >= 0) {
     todayStr = (headers[tdIdx + 1] || '').trim();
     if (!todayStr && rows[1]) todayStr = (rows[1][tdIdx] || '').trim();
   }
 
   const items = rows.slice(1)
-    .filter(row => (row[0] || '').trim() && (row[4] || '').trim())
-    .map(row => ({
+    .filter((row) => (row[0] || '').trim() && (row[4] || '').trim())
+    .map((row) => ({
       symbol:  (row[0] || '').trim(),
       company: (row[1] || '').trim(),
       purpose: (row[2] || '').trim(),
@@ -163,6 +187,7 @@ async function _fetchFromSheets() {
     heatmap:      _buildHeatmapItems(heatmapCsv),
     radar:        radarSheet.stocks,
     radarSummary: radarSheet.summary,
+    radarError:   radarSheet.error,
     results:      resultsSheet.items,
     resultsToday: resultsSheet.today,
   };

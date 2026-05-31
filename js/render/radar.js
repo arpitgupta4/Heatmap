@@ -2,7 +2,7 @@
    RENDER — radar table and summary cards
    ============================================================ */
 
-// ─── Summary Cards (Radar tab — reads pre-computed sheet values) ───────────────
+// ─── Summary Cards (Radar tab — reads pre-computed summary from api) ───────────
 function updateRadarSummary(s) {
   el.totalCount.textContent = s.totalStocks || '—';
   el.avgChange.textContent  = `${(s.pctChange || 0).toFixed(2)}%`;
@@ -25,10 +25,10 @@ function updateRadarSummary(s) {
 
   const sorted = [...state.radar].sort((a, b) => b.pctChange - a.pctChange);
   el.topGainers.innerHTML = sorted.slice(0, 5).map((r) =>
-    `<li class="mover-item"><span class="mover-symbol">${r.symbol}</span><span class="change-badge gain">${formatChange(r.pctChange)}</span></li>`
+    `<li class="mover-item"><span class="mover-symbol">${escHtml(r.symbol)}</span><span class="change-badge gain">${formatChange(r.pctChange)}</span></li>`
   ).join('');
   el.topLosers.innerHTML = sorted.slice(-5).reverse().map((r) =>
-    `<li class="mover-item"><span class="mover-symbol">${r.symbol}</span><span class="change-badge loss">${formatChange(r.pctChange)}</span></li>`
+    `<li class="mover-item"><span class="mover-symbol">${escHtml(r.symbol)}</span><span class="change-badge loss">${formatChange(r.pctChange)}</span></li>`
   ).join('');
 }
 
@@ -87,7 +87,7 @@ function renderRadarTable(items) {
     const tr = document.createElement('tr');
     if (rowClass) tr.className = rowClass;
     tr.innerHTML = `
-      <td class="col-symbol copyable" data-copy="${r.symbol}">${r.symbol}</td>
+      <td class="col-symbol copyable" data-copy="${escHtml(r.symbol)}">${escHtml(r.symbol)}</td>
       <td class="col-num">${formatPrice(r.high)}</td>
       <td class="col-num">${formatPrice(r.prevClose)}</td>
       <td class="col-num ${ltpClass}">${formatPrice(r.ltp)}</td>

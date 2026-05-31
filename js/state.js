@@ -15,7 +15,6 @@ const el = {
   resultsSearchInput:   document.getElementById('resultsSearchInput'),
   stocksBody:           document.getElementById('stocksBody'),
   radarBody:            document.getElementById('radarBody'),
-  resultsBody:          document.getElementById('resultsBody'),
   resultsDateStrip:     document.getElementById('resultsDateStrip'),
   resultsDateSection:   document.getElementById('resultsDateSection'),
   skeletonLoader:       document.getElementById('skeletonLoader'),

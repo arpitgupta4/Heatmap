@@ -15,11 +15,15 @@
  * For local dev (vercel dev), create a .env.local file — see .env.local template.
  */
 
-const { parseCsvToObjects }                          = require('./lib/csv');
-const { normalizeStockRow }                          = require('./lib/normalize');
+'use strict';
+
+const { parseCsvToObjects }                                      = require('./lib/csv');
+const { normalizeStockRow }                                      = require('./lib/normalize');
 const { parseRadarSheet, parseResultsSheet, buildHeatmapItems } = require('./lib/sheets');
 
 // ─── Sheet URLs ────────────────────────────────────────────────────────────────
+// Values come from Vercel environment variables.  The literals below are
+// public-read fallbacks for local development (vercel dev / plain server).
 const STOCKS_CSV_URL =
   process.env.STOCKS_CSV_URL ||
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vT3osxouCCViNZUmiibpkD3BrPn0DzkRylyU-Yad6E6-T5NI3bYfL1DL0wD5-NmgVpvE7j2afXv8Dx4/pub?gid=0&single=true&output=csv';
@@ -37,7 +41,8 @@ const RESULTS_CSV_URL =
   'https://docs.google.com/spreadsheets/d/e/2PACX-1vSjR79H2FbUkdxllGsK37_U8Q-zAkyYTZcV2yS5IC-gPuOvha1Q-agxqPppXitU6nz-yjODMlYaRDJC/pub?gid=1150501903&single=true&output=csv';
 
 // ─── Handler ───────────────────────────────────────────────────────────────────
-export default async function handler(req, res) {
+// Use module.exports (CJS) to stay consistent with api/lib/*.js which all use require().
+module.exports = async function handler(req, res) {
   // Only allow GET
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -70,7 +75,7 @@ export default async function handler(req, res) {
     const radarSheet   = parseRadarSheet(radarCsv);
     const resultsSheet = parseResultsSheet(resultsCsv);
 
-    // Edge cache for 5 min, serve stale for 10 min while revalidating.
+    // Edge cache: serve fresh for 5 min, allow stale for 10 min while revalidating
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     res.setHeader('Content-Type', 'application/json');
 
@@ -97,4 +102,4 @@ export default async function handler(req, res) {
       detail: err.message,
     });
   }
-}
+};

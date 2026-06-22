@@ -39,7 +39,11 @@ function updateSummary(stocks) {
   renderSentimentBar(s.pctGain);
 
   el.topGainers.innerHTML = s.topGainers.map((item) => {
-    const sym = escHtml(item.securityId || item.symbol || item.name);
+    const sym = escHtml(
+    item.securityId ||
+    item.symbol ||
+    item.sectorName
+);
     return `<li class="mover-item">
       <span class="mover-symbol">${sym}</span>
       <span class="change-badge gain">${formatChange(item.dailyChange)}</span>
@@ -57,9 +61,9 @@ function updateSummary(stocks) {
 
 // ─── Stocks Table ──────────────────────────────────────────────────────────────
 function renderStocksTable(stocks) {
-  if (!stocks.length) {
+  if (stocks.length > state.visibleCount) {
     el.stocksBody.innerHTML = `
-      <tr><td colspan="6">
+      <tr><td colspan="5">
         <div class="empty-state">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
                stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
@@ -77,19 +81,30 @@ function renderStocksTable(stocks) {
     const tr = document.createElement('tr');
     // escHtml on all data fields to prevent XSS from malicious CSV content
     tr.innerHTML = `
-      <td class="col-symbol copyable" data-copy="${escHtml(s.securityId)}">${escHtml(s.securityId)}</td>
-      <td class="copyable" data-copy="${escHtml(s.name)}">${escHtml(s.name)}</td>
-      <td class="copyable" data-copy="${escHtml(s.industry)}">${escHtml(s.industry)}</td>
-      <td class="copyable" data-copy="${escHtml(s.group)}">${escHtml(s.group)}</td>
-      <td class="copyable" data-copy="${escHtml(s.subgroup)}">${escHtml(s.subgroup)}</td>
-      <td class="col-change">${changeBadge(s.dailyChange)}</td>
-    `;
+  <td class="col-symbol copyable" data-copy="${escHtml(s.securityId)}">${escHtml(s.securityId)}</td>
+
+  <td class="copyable" data-copy="${escHtml(s.parentTheme)}">
+    ${escHtml(s.parentTheme)}
+  </td>
+
+  <td class="copyable" data-copy="${escHtml(s.sectorName)}">
+    ${escHtml(s.sectorName)}
+  </td>
+
+  <td class="copyable" data-copy="${escHtml(s.industry)}">
+    ${escHtml(s.industry)}
+  </td>
+
+  <td class="col-change">
+    ${changeBadge(s.dailyChange)}
+  </td>
+`;
     frag.appendChild(tr);
   }
 
   if (stocks.length > state.visibleCount) {
     const more = document.createElement('tr');
-    more.innerHTML = `<td colspan="6" class="load-more-cell">
+    more.innerHTML = `<td colspan="5" class="load-more-cell">
       <button class="load-more-btn" id="loadMoreStocks">
         Show more (${stocks.length - state.visibleCount} remaining)
       </button>

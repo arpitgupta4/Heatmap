@@ -79,7 +79,7 @@
             <select id="sortSelect">
               <option value="dailyChange">% Change</option>
               <option value="securityId">Symbol</option>
-              <option value="name">Sector / Name</option>
+              <option value="name">Sector</option>
               <option value="industry">Industry</option>
             </select>
           </div>
@@ -152,12 +152,11 @@
             <table class="stocks-table" aria-label="Stocks list">
               <thead>
                 <tr>
-                  <th class="sortable" data-col="securityId">Symbol <span class="sort-icon">↕</span></th>
-                  <th class="sortable" data-col="name">Sector <span class="sort-icon">↕</span></th>
-                  <th class="sortable" data-col="industry">Industry <span class="sort-icon">↕</span></th>
-                  <th class="sortable" data-col="group">Group <span class="sort-icon">↕</span></th>
-                  <th>Subgroup</th>
-                  <th class="sortable" data-col="dailyChange" style="text-align:right">% Change <span class="sort-icon">↕</span></th>
+                  <th class="sortable" data-col="securityId">Security Id <span class="sort-icon">↕</span></th>
+<th class="sortable" data-col="parentTheme">Theme <span class="sort-icon">↕</span></th>
+<th class="sortable" data-col="sectorName">Sector <span class="sort-icon">↕</span></th>
+<th class="sortable" data-col="industry">Industry <span class="sort-icon">↕</span></th>
+<th class="sortable" data-col="dailyChange" style="text-align:right">% Change <span class="sort-icon">↕</span></th>
                 </tr>
               </thead>
               <tbody id="stocksBody"></tbody>

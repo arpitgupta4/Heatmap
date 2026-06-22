@@ -35,8 +35,12 @@ function filterAndSortStocks(stocks) {
   const q = state.query.toLowerCase();
 
   const filtered = stocks.filter((s) => {
-    const content = [s.securityId, s.name, s.industry, s.group, s.subgroup]
-      .join(' ').toLowerCase();
+    const content = [
+    s.securityId,
+    s.parentTheme,
+    s.sectorName,
+    s.industry
+].join(' ').toLowerCase();
     if (q && !content.includes(q)) return false;
     if (state.filter === 'positive') return s.dailyChange > 0;
     if (state.filter === 'negative') return s.dailyChange < 0;

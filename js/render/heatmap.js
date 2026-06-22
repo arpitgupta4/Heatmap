@@ -24,7 +24,7 @@ function renderHeatmapCards(items) {
   // across subgroup, group, industry, and sector fields
   const stockCountMap = {};
   for (const s of state.stocks) {
-    for (const field of [s.subgroup, s.group, s.industry, s.name]) {
+    for (const field of [s.parentTheme,s.sectorName,s.industry]) {
       if (field) stockCountMap[field] = (stockCountMap[field] || 0) + 1;
     }
   }

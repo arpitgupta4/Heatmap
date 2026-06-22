@@ -20,7 +20,7 @@ function renderHeatmapCards(items) {
     return;
   }
 
-  // ── Stock-count lookup: count how many stocks map to each name ────────────
+  // ── Stock-count lookup ────────────────────────────────────────────────────
   const stockCountMap = {};
   for (const s of state.stocks) {
     for (const field of [s.parentTheme, s.sectorName, s.industry]) {
@@ -30,8 +30,6 @@ function renderHeatmapCards(items) {
 
   // ── Discover available types (preserving sheet order) ────────────────────
   const types = [...new Set(items.map((i) => i.type))];
-
-  // Default to first type; reset if saved filter no longer exists in data
   if (!state.heatmapFilter || !types.includes(state.heatmapFilter)) {
     state.heatmapFilter = types[0] || null;
   }
@@ -41,15 +39,14 @@ function renderHeatmapCards(items) {
   toggleBar.className = 'heatmap-toggle-bar';
 
   types.forEach((type) => {
-    const count = items.filter((i) => i.type === type).length;
-    const btn   = document.createElement('button');
-    btn.className   = 'heatmap-toggle-btn' + (type === state.heatmapFilter ? ' active' : '');
+    const cnt = items.filter((i) => i.type === type).length;
+    const btn = document.createElement('button');
+    btn.className    = 'heatmap-toggle-btn' + (type === state.heatmapFilter ? ' active' : '');
     btn.dataset.type = type;
-    btn.innerHTML   = `${escHtml(type)}<span class="heatmap-toggle-count">${count}</span>`;
     btn.setAttribute('aria-pressed', type === state.heatmapFilter ? 'true' : 'false');
-
+    btn.innerHTML    = `${escHtml(type)}<span class="heatmap-toggle-count">${cnt}</span>`;
     btn.addEventListener('click', () => {
-      if (state.heatmapFilter === type) return;       // already active
+      if (state.heatmapFilter === type) return;
       state.heatmapFilter = type;
       state._dirty.heatmap = true;
       renderHeatmapCards(state.heatmap);
@@ -58,21 +55,53 @@ function renderHeatmapCards(items) {
   });
   container.appendChild(toggleBar);
 
-  // ── Filter + sort items for the active type ──────────────────────────────
-  const filtered = items.filter((i) => i.type === state.heatmapFilter);
-  const sorted   = [...filtered].sort((a, b) => b.dailyChange - a.dailyChange);
-  const maxAbs   = Math.max(...sorted.map((i) => Math.abs(i.dailyChange)), 0.01);
+  // ── Filter + sort ────────────────────────────────────────────────────────
+  const filtered  = items.filter((i) => i.type === state.heatmapFilter);
+  const sorted    = [...filtered].sort((a, b) => b.dailyChange - a.dailyChange);
+  const maxAbs    = Math.max(...sorted.map((i) => Math.abs(i.dailyChange)), 0.01);
+
+  // ── Stats bar ─────────────────────────────────────────────────────────────
+  const gainers   = sorted.filter((i) => i.dailyChange > 0).length;
+  const losers    = sorted.filter((i) => i.dailyChange < 0).length;
+  const unchanged = sorted.length - gainers - losers;
+  const avgRaw    = sorted.length
+    ? sorted.reduce((s, i) => s + i.dailyChange, 0) / sorted.length
+    : 0;
+  const avgStr    = (avgRaw >= 0 ? '+' : '') + avgRaw.toFixed(2) + '%';
+  const avgCls    = avgRaw > 0 ? 'hm-stat-gain' : avgRaw < 0 ? 'hm-stat-loss' : '';
+
+  const statsBar  = document.createElement('div');
+  statsBar.className = 'heatmap-stats-bar';
+  statsBar.innerHTML = `
+    <span class="hm-stat"><span class="hm-stat-gain">${gainers} ▲</span> Gaining</span>
+    <span class="hm-stat-sep">·</span>
+    <span class="hm-stat"><span class="hm-stat-loss">${losers} ▼</span> Losing</span>
+    ${unchanged ? `<span class="hm-stat-sep">·</span><span class="hm-stat">${unchanged} —</span>` : ''}
+    <span class="hm-stat-sep">·</span>
+    <span class="hm-stat">Avg <strong class="${avgCls}">${avgStr}</strong></span>
+    <span class="hm-stat-right">${sorted.length} items</span>
+  `;
+  container.appendChild(statsBar);
+
+  // ── Adaptive grid column width based on item count ───────────────────────
+  const colMin = sorted.length > 200 ? '120px'
+               : sorted.length > 80  ? '145px'
+               :                       '170px';
 
   // ── Card grid ────────────────────────────────────────────────────────────
   const grid = document.createElement('div');
   grid.className = 'heatmap-grid';
-  // Fade in on toggle switch
-  grid.style.animation = 'fade-in 0.25s ease-out forwards';
+  grid.style.cssText = `
+    grid-template-columns: repeat(auto-fill, minmax(${colMin}, 1fr));
+    animation: fade-in 0.22s ease-out forwards;
+  `;
 
   for (const item of sorted) {
-    const cardClass     = item.dailyChange > 0 ? 'gain-card' : item.dailyChange < 0 ? 'loss-card' : '';
-    const mag           = Math.abs(item.dailyChange) / maxAbs;
-    const valueFontSize = (1 + mag * 0.6).toFixed(2);
+    const isGain = item.dailyChange > 0;
+    const isLoss = item.dailyChange < 0;
+    const cardClass     = isGain ? 'gain-card' : isLoss ? 'loss-card' : '';
+    const mag           = Math.abs(item.dailyChange) / maxAbs;          // 0 – 1
+    const valueFontSize = (0.95 + mag * 0.55).toFixed(2);
     const count         = stockCountMap[item.name];
     const displayName   = count ? `${escHtml(item.name)} (${count})` : escHtml(item.name);
 
@@ -80,10 +109,12 @@ function renderHeatmapCards(items) {
     card.className    = `heatmap-card copyable ${cardClass}`;
     card.dataset.copy = item.name;
     card.title        = `Click to copy "${item.name}"`;
+    // Pass magnitude as CSS custom property for intensity-based coloring
+    card.style.setProperty('--mag', mag.toFixed(3));
     card.innerHTML    = `
       <span class="heatmap-card-name">${displayName}</span>
       <span class="heatmap-card-value" style="font-size:${valueFontSize}rem">
-        ${item.dailyChange > 0 ? '▲' : item.dailyChange < 0 ? '▼' : ''} ${formatChange(item.dailyChange)}
+        ${isGain ? '▲' : isLoss ? '▼' : '–'} ${formatChange(item.dailyChange)}
       </span>
     `;
     grid.appendChild(card);

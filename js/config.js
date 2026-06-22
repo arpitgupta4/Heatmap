@@ -1,7 +1,7 @@
 /* ============================================================
    CONFIG — constants and sheet URLs (loaded first)
    ============================================================ */
-const CACHE_KEY = 'heatmapDataCache_v8';
+const CACHE_KEY = 'heatmapDataCache_v9';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 const PAGE_SIZE = 250;            // rows rendered per page
 

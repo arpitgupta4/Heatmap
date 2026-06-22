@@ -954,7 +954,7 @@ th.sort-active .sort-icon {
 }
 
 .heatmap-card-value {
-  font-size: 1.05rem;
+  font-size: 1.05rem;   /* FIXED — never change dynamically */
   font-weight: 800;
   letter-spacing: -0.02em;
   white-space: nowrap;

@@ -38,23 +38,15 @@ function _normalizeRadarRow(row) {
 
 function _normalizeStockRow(row) {
   return {
-    securityId: row['Security Id'] || '',
-    parentTheme: row['Parent Theme'] || '',
-    sectorName: row['Sector Name'] || '',
-    industry: row['Industry'] || '',
-
-    dailyChange: _parseNumber(
-      row['%Change'] ||
-      row['% Change'] ||
-      ''
-    ),
-
-    change: _parseNumber(
-      row['Daily Change'] ||
-      row['Change'] ||
-      0
-    ),
-
+    securityId:  row['Security Id'] || '',
+    // 'Theme' is the new column name; 'Parent Theme' is the old name (kept for backward compat)
+    parentTheme: row['Theme'] || row['Parent Theme'] || '',
+    // 'Sector' is the new column name; 'Sector Name' is the old name (kept for backward compat)
+    sectorName:  row['Sector'] || row['Sector Name'] || '',
+    industry:    row['Industry'] || '',
+    // 'Daily Change' = absolute Δ (col E), '%Change' = percentage Δ (col F)
+    dailyChange: _parseNumber(row['%Change'] || row['% Change'] || ''),
+    change:      _parseNumber(row['Daily Change'] || row['Change'] || 0),
     ltp: 0,
   };
 }

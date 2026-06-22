@@ -15,17 +15,16 @@ function normalizeRadarRow(row) {
 
 function normalizeStockRow(row) {
   return {
-    securityId:  row['Security Id'] || row['Name'] || '',
-    name:        row['Sector Name'] || row['Name'] || row['Security Id'] || '',
-    industry:    row['Industry New Name'] || row['Industry'] || '',
-    group:       row['Igroup Name'] || row['Group'] || '',
-    subgroup:    row['ISubgroup Name'] || row['Subgroup'] || '',
-    dailyChange: parseNumber(
-      row['%Change'] || row['Daily Chang'] || row['Daily Change'] ||
-      row['% Change'] || row['Daily %change'] || ''
-    ),
-    change: parseNumber(row['Daily Change'] || row['Change'] || 0),
-    ltp:    parseNumber(row['LTP'] || row['Close'] || row['Last Price'] || 0),
+    securityId:  row['Security Id'] || '',
+    // 'Theme' is the new column name; 'Parent Theme' is the old name (kept for backward compat)
+    parentTheme: row['Theme'] || row['Parent Theme'] || '',
+    // 'Sector' is the new column name; 'Sector Name' is the old name (kept for backward compat)
+    sectorName:  row['Sector'] || row['Sector Name'] || '',
+    industry:    row['Industry'] || '',
+    // 'Daily Change' = absolute Δ (col E), '%Change' = percentage Δ (col F)
+    dailyChange: parseNumber(row['%Change'] || row['% Change'] || ''),
+    change:      parseNumber(row['Daily Change'] || row['Change'] || 0),
+    ltp:         parseNumber(row['LTP'] || row['Close'] || row['Last Price'] || 0),
   };
 }
 

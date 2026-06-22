@@ -960,6 +960,68 @@ th.sort-active .sort-icon {
   color: var(--neutral);
 }
 
+/* ── Heatmap Toggle Bar ──────────────────────────────────────────────────── */
+.heatmap-toggle-bar {
+  display: flex;
+  gap: 10px;
+  padding: 20px 20px 4px;
+  flex-wrap: wrap;
+}
+
+.heatmap-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease),
+              border-color var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease),
+              box-shadow var(--dur-fast) var(--ease);
+}
+
+.heatmap-toggle-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: rgba(148, 163, 184, 0.25);
+}
+
+.heatmap-toggle-btn.active {
+  background: rgba(99, 102, 241, 0.15);
+  border-color: var(--accent);
+  color: #a5b4fc;
+  box-shadow: 0 0 0 1px var(--accent), 0 0 16px var(--accent-glow);
+}
+
+.heatmap-toggle-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--radius-full);
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  transition: background var(--dur-fast) var(--ease),
+              color var(--dur-fast) var(--ease);
+}
+
+.heatmap-toggle-btn.active .heatmap-toggle-count {
+  background: rgba(99, 102, 241, 0.25);
+  color: #c7d2fe;
+}
+
 /* ============================================================
    ANALYSIS PANEL (Top Movers)
    ============================================================ */

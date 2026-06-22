@@ -58,6 +58,7 @@ const state = {
   lastFetched:    null,
   radarSortBy:    'pctChange',
   radarSortDir:   'desc',
+  heatmapFilter:  null,           // active toggle: 'Theme' | 'Sector' | 'Industry'
   visibleCount:   PAGE_SIZE,
   _dirty:         { stocks: true, heatmap: true, radar: true, results: true },
 };

@@ -61,7 +61,7 @@ function updateSummary(stocks) {
 
 // ─── Stocks Table ──────────────────────────────────────────────────────────────
 function renderStocksTable(stocks) {
-  if (stocks.length > state.visibleCount) {
+  if (!stocks.length) {
     el.stocksBody.innerHTML = `
       <tr><td colspan="5">
         <div class="empty-state">

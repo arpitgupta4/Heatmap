@@ -101,7 +101,6 @@ function renderHeatmapCards(items) {
     const isLoss = item.dailyChange < 0;
     const cardClass     = isGain ? 'gain-card' : isLoss ? 'loss-card' : '';
     const mag           = Math.abs(item.dailyChange) / maxAbs;          // 0 – 1
-    const valueFontSize = (0.95 + mag * 0.55).toFixed(2);
     const count         = stockCountMap[item.name];
     const displayName   = count ? `${escHtml(item.name)} (${count})` : escHtml(item.name);
 
@@ -113,7 +112,7 @@ function renderHeatmapCards(items) {
     card.style.setProperty('--mag', mag.toFixed(3));
     card.innerHTML    = `
       <span class="heatmap-card-name">${displayName}</span>
-      <span class="heatmap-card-value" style="font-size:${valueFontSize}rem">
+      <span class="heatmap-card-value">
         ${isGain ? '▲' : isLoss ? '▼' : '–'} ${formatChange(item.dailyChange)}
       </span>
     `;

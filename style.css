@@ -914,33 +914,25 @@ th.sort-active .sort-icon {
   z-index: 1;
 }
 
-/* Intensity-based: --mag (0–1) drives colour depth per card */
+/* Flat uniform colors — same shade for every gain/loss card */
 .heatmap-card.gain-card {
-  background: linear-gradient(
-    135deg,
-    rgba(34, 197, 94,  calc(0.04 + var(--mag, 0.4) * 0.24)) 0%,
-    rgba(21, 128, 61,  calc(0.02 + var(--mag, 0.4) * 0.14)) 100%
-  );
-  border-color: rgba(34, 197, 94, calc(0.12 + var(--mag, 0.4) * 0.48));
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.09) 0%, rgba(21, 128, 61, 0.05) 100%);
+  border-color: rgba(34, 197, 94, 0.22);
 }
 
 .heatmap-card.loss-card {
-  background: linear-gradient(
-    135deg,
-    rgba(239, 68, 68,  calc(0.04 + var(--mag, 0.4) * 0.24)) 0%,
-    rgba(153, 27, 27,  calc(0.02 + var(--mag, 0.4) * 0.14)) 100%
-  );
-  border-color: rgba(239, 68, 68, calc(0.12 + var(--mag, 0.4) * 0.48));
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.09) 0%, rgba(153, 27, 27, 0.05) 100%);
+  border-color: rgba(239, 68, 68, 0.22);
 }
 
 .heatmap-card.gain-card:hover {
-  box-shadow: 0 12px 40px rgba(34, 197, 94, calc(0.15 + var(--mag, 0.4) * 0.30));
-  border-color: rgba(34, 197, 94, calc(0.35 + var(--mag, 0.4) * 0.50));
+  box-shadow: 0 12px 40px var(--gain-glow);
+  border-color: rgba(34, 197, 94, 0.40);
 }
 
 .heatmap-card.loss-card:hover {
-  box-shadow: 0 12px 40px rgba(239, 68, 68, calc(0.15 + var(--mag, 0.4) * 0.30));
-  border-color: rgba(239, 68, 68, calc(0.35 + var(--mag, 0.4) * 0.50));
+  box-shadow: 0 12px 40px var(--loss-glow);
+  border-color: rgba(239, 68, 68, 0.40);
 }
 
 .heatmap-card-name {

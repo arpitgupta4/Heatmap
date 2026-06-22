@@ -99,17 +99,14 @@ function renderHeatmapCards(items) {
   for (const item of sorted) {
     const isGain = item.dailyChange > 0;
     const isLoss = item.dailyChange < 0;
-    const cardClass     = isGain ? 'gain-card' : isLoss ? 'loss-card' : '';
-    const mag           = Math.abs(item.dailyChange) / maxAbs;          // 0 – 1
-    const count         = stockCountMap[item.name];
-    const displayName   = count ? `${escHtml(item.name)} (${count})` : escHtml(item.name);
+    const cardClass   = isGain ? 'gain-card' : isLoss ? 'loss-card' : '';
+    const count       = stockCountMap[item.name];
+    const displayName = count ? `${escHtml(item.name)} (${count})` : escHtml(item.name);
 
     const card = document.createElement('div');
     card.className    = `heatmap-card copyable ${cardClass}`;
     card.dataset.copy = item.name;
     card.title        = `Click to copy "${item.name}"`;
-    // Pass magnitude as CSS custom property for intensity-based coloring
-    card.style.setProperty('--mag', mag.toFixed(3));
     card.innerHTML    = `
       <span class="heatmap-card-name">${displayName}</span>
       <span class="heatmap-card-value">
